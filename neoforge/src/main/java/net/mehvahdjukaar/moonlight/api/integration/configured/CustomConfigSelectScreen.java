@@ -17,7 +17,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.ModList;
@@ -30,10 +30,12 @@ import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
+import java.net.URI;
+
 public class CustomConfigSelectScreen extends ModConfigSelectionScreen {
 
-    public static final ResourceLocation ON_ICON = Moonlight.res("yes");
-    public static final ResourceLocation OFF_ICON = Moonlight.res("no");
+    public static final Identifier ON_ICON = Moonlight.res("yes");
+    public static final Identifier OFF_ICON = Moonlight.res("no");
 
     private static final Field FILE_ITEM_BUTTON = CustomConfigScreen.findFieldOrNull(FileItem.class, "modifyButton");
     private static final Field FILE_ITEM_CONFIG = CustomConfigScreen.findFieldOrNull(FileItem.class, "config");
@@ -64,8 +66,8 @@ public class CustomConfigSelectScreen extends ModConfigSelectionScreen {
         this.modURL = container.getModInfo().getModURL().map(URL::getPath).orElse(null);
     }
 
-    public static ResourceLocation ensureNotNull(ResourceLocation background) {
-        return background == null ? ResourceLocation.parse("minecraft:textures/gui/options_background.png") : background;
+    public static Identifier ensureNotNull(Identifier background) {
+        return background == null ? Identifier.parse("minecraft:textures/gui/options_background.png") : background;
     }
 
     public ItemStack getMainIcon() {
@@ -141,7 +143,7 @@ public class CustomConfigSelectScreen extends ModConfigSelectionScreen {
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (this.modURL != null && MthUtils.isWithinRectangle((this.width / 2) - 90, 2, 180, 16, (int) mouseX, (int) mouseY)) {
-            Style style = Style.EMPTY.withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, this.modURL));
+            Style style = Style.EMPTY.withClickEvent(new ClickEvent.OpenUrl(URI.create(this.modURL)));
             this.handleComponentClicked(style);
             return true;
         } else {

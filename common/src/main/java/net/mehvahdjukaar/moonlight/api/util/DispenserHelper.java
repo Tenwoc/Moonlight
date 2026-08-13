@@ -4,6 +4,7 @@ package net.mehvahdjukaar.moonlight.api.util;
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import net.mehvahdjukaar.moonlight.api.block.ISoftFluidTankProvider;
 import net.mehvahdjukaar.moonlight.api.fluids.SoftFluidTank;
+import net.mehvahdjukaar.moonlight.api.item.additional_placements.AdditionalItemPlacementsAPI;
 import net.mehvahdjukaar.moonlight.core.Moonlight;
 import net.mehvahdjukaar.moonlight.core.mixins.accessor.DispenserBlockAccessor;
 import net.mehvahdjukaar.moonlight.core.mixins.accessor.DispenserBlockEntityAccessor;
@@ -17,7 +18,6 @@ import net.minecraft.core.dispenser.DispenseItemBehavior;
 import net.minecraft.core.dispenser.OptionalDispenseItemBehavior;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.WorldlyContainer;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
@@ -123,17 +123,6 @@ public class DispenserHelper {
         return inner;
     }
 
-    @Deprecated(forRemoval = true)
-    public static void registerCustomBehavior(AdditionalDispenserBehavior behavior) {
-        DispenserBlock.registerBehavior(behavior.item, behavior);
-    }
-
-    //block placement behavior
-    @Deprecated(forRemoval = true)
-    public static void registerPlaceBlockBehavior(ItemLike block) {
-        DispenserBlock.registerBehavior(block, PLACE_BLOCK_BEHAVIOR);
-    }
-
     /**
      * implement this to add your own custom behaviors
      */
@@ -152,16 +141,16 @@ public class DispenserHelper {
         public final ItemStack dispense(BlockSource source, ItemStack stack) {
             //this.setSuccessful(false);
             try {
-                InteractionResultHolder<ItemStack> result = this.customBehavior(source, stack);
-                InteractionResult type = result.getResult();
+                ItemStackResult result = this.customBehavior(source, stack);
+                InteractionResult type = result.result();
                 if (type != InteractionResult.PASS) {
                     boolean success = type.consumesAction();
                     this.playSound(source, success);
                     this.playAnimation(source, source.state().getValue(DispenserBlock.FACING));
                     if (success) {
-                        ItemStack resultStack = result.getObject();
+                        ItemStack resultStack = result.stack();
                         if (resultStack.getItem() == stack.getItem()) return resultStack;
-                        return fillItemInDispenser(source, stack, result.getObject());
+                        return fillItemInDispenser(source, stack, resultStack);
                     }
                 }
             } catch (Exception ignored) {
@@ -176,10 +165,11 @@ public class DispenserHelper {
          *
          * @param source dispenser block
          * @param stack  stack to dispense
-         * @return return ActionResult.SUCCESS / CONSUME for success, FAIL to do nothing and PASS to fall back to vanilla/previously registered behavior will be used. <br>
-         * Type parameter is return item stack. If item in itemstack is different from initially provided, such itemstack will be added to dispenser, otherwise will replace existing itemstack
+         * @return SUCCESS / CONSUME for success, FAIL to do nothing and PASS to fall back to vanilla/previously registered behavior. <br>
+         * The returned stack is only read on success: if its item differs from the one provided it gets added to the
+         * dispenser, otherwise it replaces the existing stack
          */
-        protected abstract InteractionResultHolder<ItemStack> customBehavior(BlockSource source, ItemStack stack);
+        protected abstract ItemStackResult customBehavior(BlockSource source, ItemStack stack);
 
         protected void playSound(BlockSource source, boolean success) {
             source.level().levelEvent(success ? 1000 : 1001, source.pos(), 0);
@@ -224,7 +214,7 @@ public class DispenserHelper {
         }
 
         @Override
-        protected InteractionResultHolder<ItemStack> customBehavior(BlockSource source, ItemStack stack) {
+        protected ItemStackResult customBehavior(BlockSource source, ItemStack stack) {
             //this.setSuccessful(false);
             ServerLevel world = source.level();
             BlockPos blockpos = source.pos().relative(source.state().getValue(DispenserBlock.FACING));
@@ -237,11 +227,11 @@ public class DispenserHelper {
                         tile.getItem(0).grow(1);
                         stack.shrink(1);
                     }
-                    return InteractionResultHolder.success(stack);
+                    return ItemStackResult.success(stack);
                 }
-                return InteractionResultHolder.fail(stack);
+                return ItemStackResult.fail(stack);
             }
-            return InteractionResultHolder.pass(stack);
+            return ItemStackResult.pass(stack);
         }
     }
 
@@ -253,37 +243,26 @@ public class DispenserHelper {
         }
 
         @Override
-        protected InteractionResultHolder<ItemStack> customBehavior(BlockSource source, ItemStack stack) {
+        protected ItemStackResult customBehavior(BlockSource source, ItemStack stack) {
             Item item = stack.getItem();
-            if (item instanceof BlockItem bi) {
-                Direction direction = source.state().getValue(DispenserBlock.FACING);
-                BlockPos blockpos = source.pos().relative(direction);
-                // Direction direction1 = source.getLevel().isEmptyBlock(blockpos.below()) ? direction : Direction.UP;
-                InteractionResult result = bi.place(new DirectionalPlaceContext(source.level(), blockpos, direction, stack, direction));
-                var res = new InteractionResultHolder<>(result, stack);
-                if (result.consumesAction()) {
-                    return res;
-                }
-            }
-            return InteractionResultHolder.pass(stack);
-        }
-    }
+            Direction direction = source.state().getValue(DispenserBlock.FACING);
+            BlockPos blockpos = source.pos().relative(direction);
+            // Direction direction1 = source.getLevel().isEmptyBlock(blockpos.below()) ? direction : Direction.UP;
+            DirectionalPlaceContext context = new DirectionalPlaceContext(source.level(), blockpos, direction, stack, direction);
 
-    @Deprecated(forRemoval = true)
-    public static class PlaceBlockDispenseBehavior extends OptionalDispenseItemBehavior {
-
-        @Override
-        public ItemStack execute(BlockSource source, ItemStack stack) {
-            this.setSuccess(false);
-            Item item = stack.getItem();
-            if (item instanceof BlockItem bi) {
-                Direction direction = source.state().getValue(DispenserBlock.FACING);
-                BlockPos blockpos = source.pos().relative(direction);
-                // Direction direction1 = source.getLevel().isEmptyBlock(blockpos.below()) ? direction : Direction.UP;
-                InteractionResult result = bi.place(new DirectionalPlaceContext(source.level(), blockpos, direction, stack, direction));
-                this.setSuccess(result.consumesAction());
+            InteractionResult result = null;
+            //takes priority as it does when used by a player. Also covers items that aren't BlockItems at all
+            var placement = AdditionalItemPlacementsAPI.getBehavior(item);
+            if (placement != null) {
+                result = placement.overridePlace(context);
             }
-            return stack;
+            if ((result == null || !result.consumesAction()) && item instanceof BlockItem bi) {
+                result = bi.place(context);
+            }
+            if (result != null && result.consumesAction()) {
+                return new ItemStackResult(result, stack);
+            }
+            return ItemStackResult.pass(stack);
         }
     }
 
@@ -294,7 +273,7 @@ public class DispenserHelper {
         }
 
         @Override
-        protected InteractionResultHolder<ItemStack> customBehavior(BlockSource source, ItemStack stack) {
+        protected ItemStackResult customBehavior(BlockSource source, ItemStack stack) {
             BlockPos blockpos = source.pos().relative(source.state().getValue(DispenserBlock.FACING));
             BlockEntity te = source.level().getBlockEntity(blockpos);
             if (te instanceof ISoftFluidTankProvider tile) {
@@ -306,18 +285,16 @@ public class DispenserHelper {
                         returnStack = tank.interactWithItem(stack, source.level(), blockpos, false);
                         if (returnStack != null) {
                             te.setChanged();
-                            return InteractionResultHolder.success(returnStack);
+                            return ItemStackResult.success(returnStack);
                         }
                     }
                 }
-                return InteractionResultHolder.fail(stack);
+                return ItemStackResult.fail(stack);
             }
-            return InteractionResultHolder.pass(stack);
+            return ItemStackResult.pass(stack);
         }
     }
 
-    @Deprecated(forRemoval = true)
-    public static final DefaultDispenseItemBehavior PLACE_BLOCK_BEHAVIOR = new PlaceBlockDispenseBehavior();
     private static final DefaultDispenseItemBehavior SHOOT_BEHAVIOR = new DefaultDispenseItemBehavior();
 
 

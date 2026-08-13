@@ -5,7 +5,7 @@ import net.mehvahdjukaar.moonlight.api.misc.Triplet;
 import net.mehvahdjukaar.moonlight.core.Moonlight;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
@@ -21,7 +21,7 @@ public class SoftFluidImpl {
         return Pair.of(l, tr);
     }
 
-    public static Triplet<ResourceLocation, ResourceLocation, Integer> getRenderingData(ResourceLocation useTexturesFrom) {
+    public static Triplet<Identifier, Identifier, Integer> getRenderingData(Identifier useTexturesFrom) {
         Fluid f = BuiltInRegistries.FLUID.getOptional(useTexturesFrom).orElse(null);
         if (f != null && f != Fluids.EMPTY) {
             // do we even have access on this on server side?

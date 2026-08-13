@@ -33,7 +33,7 @@ public class SpawnBoxBlock extends Block implements EntityBlock, GameMasterBlock
             if (player instanceof ServerPlayer serverPlayer) {
                 be.sendOpenGuiPacket(serverPlayer, hitResult.getDirection(), hitResult.getLocation());
             }
-            return InteractionResult.sidedSuccess(level.isClientSide);
+            return InteractionResult.SUCCESS;
         } else {
             return InteractionResult.PASS;
         }

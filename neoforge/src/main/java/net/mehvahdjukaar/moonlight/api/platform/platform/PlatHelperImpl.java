@@ -15,6 +15,8 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.component.DataComponentHolder;
 import net.minecraft.core.component.DataComponentType;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.particles.SimpleParticleType;
@@ -23,7 +25,8 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerEntity;
 import net.minecraft.server.level.ServerLevel;
@@ -51,32 +54,36 @@ import net.neoforged.fml.ModList;
 import net.neoforged.fml.ModLoader;
 import net.neoforged.fml.ModLoadingContext;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.neoforged.fml.loading.FMLEnvironment;
+import net.neoforged.fml.jarcontents.JarContents;
 import net.neoforged.fml.loading.FMLLoader;
 import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.fml.util.ObfuscationReflectionHelper;
-import net.neoforged.neoforge.common.DeferredSpawnEggItem;
 import net.neoforged.neoforge.common.MutableDataComponentHolder;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.conditions.ICondition;
 import net.neoforged.neoforge.common.util.FakePlayer;
 import net.neoforged.neoforge.common.util.FakePlayerFactory;
-import net.neoforged.neoforge.event.AddReloadListenerEvent;
+import net.neoforged.neoforge.event.AddServerReloadListenersEvent;
 import net.neoforged.neoforge.event.EventHooks;
 import net.neoforged.neoforge.event.TagsUpdatedEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
 import net.neoforged.neoforgespi.language.IModFileInfo;
 import net.neoforged.neoforgespi.language.IModInfo;
+import net.neoforged.neoforgespi.locating.IModFile;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.net.URI;
 import java.net.URL;
+import java.nio.file.FileSystemNotFoundException;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -85,11 +92,11 @@ import java.util.function.Supplier;
 public class PlatHelperImpl {
 
     public static boolean isDev() {
-        return !FMLLoader.isProduction();
+        return !FMLLoader.getCurrent().isProduction();
     }
 
     public static PlatHelper.Side getPhysicalSide() {
-        return FMLEnvironment.dist == Dist.CLIENT ? PlatHelper.Side.CLIENT : PlatHelper.Side.SERVER;
+        return FMLLoader.getCurrent().getDist() == Dist.CLIENT ? PlatHelper.Side.CLIENT : PlatHelper.Side.SERVER;
     }
 
     public static PlatHelper.Platform getPlatform() {
@@ -119,7 +126,10 @@ public class PlatHelperImpl {
     }
 
     public static boolean isMobGriefingOn(Level level, Entity entity) {
-        return EventHooks.canEntityGrief(level, entity);
+        if (level instanceof ServerLevel serverLevel) {
+            return EventHooks.canEntityGrief(serverLevel, entity);
+        }
+        return true;
     }
 
     public static boolean isAreaLoaded(LevelReader level, BlockPos pos, int maxRange) {
@@ -128,11 +138,13 @@ public class PlatHelperImpl {
 
     @Nullable
     public static FoodProperties getFoodProperties(ItemStack stack, Player player) {
-        return stack.getFoodProperties(player);
+        return stack.get(DataComponents.FOOD);
     }
 
     public static int getBurnTime(ItemStack stack) {
-        return stack.getBurnTime(RecipeType.SMELTING);
+        MinecraftServer server = getCurrentServer();
+        if (server == null) return 0;
+        return stack.getBurnTime(RecipeType.SMELTING, server.fuelValues());
     }
 
     public static int getFireSpreadSpeed(BlockState state, BlockGetter level, BlockPos pos, Direction direction) {
@@ -213,16 +225,45 @@ public class PlatHelperImpl {
         IModInfo info = container.getModInfo();
         String logo = info.getLogoFile().orElse(null);
         if (logo == null || logo.isBlank()) return null;
-        Path path = info.getOwningFile().getFile().findResource(logo);
-        return path != null && java.nio.file.Files.exists(path) ? path : null;
+        return findResourcePath(info.getOwningFile().getFile(), logo);
     }
 
     @Nullable
     public static Path findModResource(String modId, String path) {
         IModFileInfo file = ModList.get().getModFileById(modId);
         if (file == null) return null;
-        Path found = file.getFile().findResource(path);
-        return found != null && Files.exists(found) ? found : null;
+        return findResourcePath(file.getFile(), path);
+    }
+
+    // IModFile.findResource is gone; resolve through JarContents, mounting the jar filesystem when needed
+    @Nullable
+    private static Path findResourcePath(IModFile modFile, String path) {
+        JarContents contents = modFile.getContents();
+        URI uri = contents.findFile(path).orElse(null);
+        if (uri != null) return pathFromUri(uri);
+        // findFile only matches files; fall back to the content roots so directories resolve too
+        for (Path root : contents.getContentRoots()) {
+            Path resolved = Files.isDirectory(root) ? root.resolve(path)
+                    : pathFromUri(URI.create("jar:" + root.toUri() + "!/" + path));
+            if (resolved != null && Files.exists(resolved)) return resolved;
+        }
+        return null;
+    }
+
+    @Nullable
+    private static Path pathFromUri(URI uri) {
+        try {
+            return Path.of(uri);
+        } catch (FileSystemNotFoundException e) {
+            try {
+                FileSystems.newFileSystem(uri, Map.of());
+                return Path.of(uri);
+            } catch (Exception ex) {
+                return null;
+            }
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public static List<String> getModAuthors(String modId) {
@@ -245,7 +286,8 @@ public class PlatHelperImpl {
     }
 
     public static SpawnEggItem newSpawnEgg(Supplier<? extends EntityType<? extends Mob>> entityType, int color, int outerColor, Item.Properties properties) {
-        return new DeferredSpawnEggItem(entityType, color, outerColor, properties);
+        // colors are data driven now; entity types register before items so the supplier resolves here
+        return new SpawnEggItem(properties.spawnEgg(entityType.get()));
     }
 
     public static Path getModFilePath(String modId) {
@@ -275,7 +317,7 @@ public class PlatHelperImpl {
     }
 
     public static <T extends BlockEntity> BlockEntityType<T> newBlockEntityType(PlatHelper.BlockEntitySupplier<T> blockEntitySupplier, Block... validBlocks) {
-        return BlockEntityType.Builder.of(blockEntitySupplier::create, validBlocks).build(null);
+        return new BlockEntityType<>(blockEntitySupplier::create, validBlocks);
     }
 
     public static <E extends Entity> EntityType<E> newEntityType(String name,
@@ -283,7 +325,8 @@ public class PlatHelperImpl {
                                                                  int clientTrackingRange, boolean velocityUpdates, int updateInterval) {
         return EntityType.Builder.of(factory, category)
                 .sized(width, height).clientTrackingRange(clientTrackingRange)
-                .setShouldReceiveVelocityUpdates(velocityUpdates).updateInterval(updateInterval).build(name);
+                .setShouldReceiveVelocityUpdates(velocityUpdates).updateInterval(updateInterval)
+                .build(ResourceKey.create(Registries.ENTITY_TYPE, Identifier.parse(name)));
     }
 
 
@@ -332,17 +375,17 @@ public class PlatHelperImpl {
     public static void addReloadableCommonSetup(BiConsumer<RegistryAccess, Boolean> listener) {
         Moonlight.assertInitPhase();
         Consumer<TagsUpdatedEvent> eventConsumer = event -> {
-            listener.accept(event.getRegistryAccess(),
-                    event.getUpdateCause() == TagsUpdatedEvent.UpdateCause.CLIENT_PACKET_RECEIVED);
+            listener.accept(event.getRegistries(),
+                    event instanceof TagsUpdatedEvent.ClientPacketReceived);
         };
         NeoForge.EVENT_BUS.addListener(eventConsumer);
     }
 
     //maybe move these
-    public static void addServerReloadListener(Function<HolderLookup.Provider, PreparableReloadListener> listener, ResourceLocation location) {
+    public static void addServerReloadListener(Function<HolderLookup.Provider, PreparableReloadListener> listener, Identifier location) {
         Moonlight.assertInitPhase();
 
-        Consumer<AddReloadListenerEvent> eventConsumer = event -> event.addListener(
+        Consumer<AddServerReloadListenersEvent> eventConsumer = event -> event.addListener(location,
                 listener.apply(event.getServerResources().getRegistryLookup()));
         NeoForge.EVENT_BUS.addListener(eventConsumer);
     }

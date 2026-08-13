@@ -3,22 +3,23 @@ package net.mehvahdjukaar.moonlight.api.client.gui.widget;
 import net.mehvahdjukaar.moonlight.core.Moonlight;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 /**
  * A rounded chat-bubble widget: white interior, black outline, fixed height, variable width.
  * <p>
- * Can be added to a screen like any other {@link AbstractWidget}, or positioned dynamically
- * above another widget via {@link #renderPointingAt(GuiGraphics, AbstractWidget, int, int, int, float)}.
+ * Can be added to a screen like any other AbstractWidget, or positioned dynamically
+ * above another widget via AbstractWidget, int, int, int, float).
  */
 public class ChatBubbleWidget extends AbstractWidget {
 
-    private static final ResourceLocation BODY = Moonlight.res("widget/chat_bubble_body");
-    private static final ResourceLocation TAIL = Moonlight.res("widget/chat_bubble_tail");
+    private static final Identifier BODY = Moonlight.res("widget/chat_bubble_body");
+    private static final Identifier TAIL = Moonlight.res("widget/chat_bubble_tail");
 
     public static final int HEIGHT = 12;
     private static final int TAIL_WIDTH = 7;
@@ -65,18 +66,18 @@ public class ChatBubbleWidget extends AbstractWidget {
     }
 
     @Override
-    protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        graphics.blitSprite(BODY, this.getX(), this.getY(), this.getWidth(), this.getHeight());
+    protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+        graphics.blitSprite(RenderPipelines.GUI_TEXTURED, BODY, this.getX(), this.getY(), this.getWidth(), this.getHeight());
 
         int textX = this.getX() + PADDING;
         int textY = this.getY() + (this.getHeight() - this.font.lineHeight) / 2 + 1;
-        graphics.drawString(this.font, this.getMessage(), textX, textY, this.textColor, false);
+        graphics.text(this.font, this.getMessage(), textX, textY, this.textColor, false);
     }
 
     /**
-     * Renders this bubble above {@code target}, clamped to the screen width and with an optional bob animation.
+     * Renders this bubble above target, clamped to the screen width and with an optional bob animation.
      */
-    public void renderPointingAt(GuiGraphics graphics, AbstractWidget target, int screenWidth,
+    public void renderPointingAt(GuiGraphicsExtractor graphics, AbstractWidget target, int screenWidth,
                                  int mouseX, int mouseY, float partialTick) {
         int bubbleW = this.getWidth();
         int targetCenterX = target.getX() + target.getWidth() / 2;
@@ -97,9 +98,9 @@ public class ChatBubbleWidget extends AbstractWidget {
 
         this.setX(bubbleX);
         this.setY(bubbleY);
-        this.renderWidget(graphics, mouseX, mouseY, partialTick);
+        this.extractWidgetRenderState(graphics, mouseX, mouseY, partialTick);
 
-        graphics.blitSprite(TAIL, tailX, tailY, TAIL_WIDTH, TAIL_HEIGHT);
+        graphics.blitSprite(RenderPipelines.GUI_TEXTURED, TAIL, tailX, tailY, TAIL_WIDTH, TAIL_HEIGHT);
     }
 
     @Override

@@ -19,14 +19,10 @@ public class VillagersAIHooksExample {
         // VillagerAIHooks.addBrainModification(VillagersAIHooksExample::onBrainEvent);
     }
 
+    // Memory modules are still registered normally. Villagers pick them up from the sensors and
+    // activities you add in the event below, there's no separate registration step anymore
     public static final Supplier<MemoryModuleType<Integer>> CUSTOM_MEMORY = RegHelper.registerMemoryModule(
             Moonlight.res("custom_memory"), Codec.INT);
-
-    // call during mod setup
-    public static void setup(){
-        // Register new memory module to villagers
-        VillagerAIHooks.registerMemory(CUSTOM_MEMORY.get());
-    }
 
     // Custom event added by the mod. If you are on Forge, you can also use @SubscribeEvent annotation as it implements Event
     private static void onBrainEvent(IVillagerBrainEvent event) {

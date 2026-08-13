@@ -7,14 +7,16 @@ import net.mehvahdjukaar.moonlight.api.client.gui.widget.IconButton;
 import net.mehvahdjukaar.moonlight.api.platform.configs.options.ConfigCategory;
 import net.mehvahdjukaar.moonlight.api.platform.configs.options.ConfigOption;
 import net.mehvahdjukaar.moonlight.api.platform.configs.options.ConfigReloadType;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.network.chat.Component;
+import net.minecraft.client.input.MouseButtonEvent;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -23,12 +25,9 @@ import java.util.Objects;
 import static net.mehvahdjukaar.moonlight.core.client.config.ConfigScreenLayout.*;
 import static net.mehvahdjukaar.moonlight.api.client.gui.misc.ConfigGuiColors.*;
 
-/**
- * A single editable config value on the main config screen: a single-line name with the editing control from
- * {@link ConfigControllers} pinned to the right and an icon reset button. Values that have a description show a
- * disclosure triangle in the left gutter; clicking the label area toggles it, dropping the wrapped description
- * beneath the row as read-only {@link DescriptionRow}s. A reload/restart hint sprite sits in the far-left gutter.
- */
+// A single editable config value: a one-line name with its control pinned to the right and a reset button. Values with
+// a description show a disclosure triangle in the left gutter, and clicking the label drops the wrapped description
+// beneath the row as read-only DescriptionRows. A reload/restart hint sprite sits in the far-left gutter.
 class OptionRow extends ConfigListRow {
 
     private final ConfigScreenAccess view;
@@ -37,7 +36,7 @@ class OptionRow extends ConfigListRow {
     @Nullable
     private final ConfigCategory owner; // the category this value lives under, for feature-gating greyout
     private final boolean isGate; // this value IS its category's feature() toggle (the "enabled" switch)
-    private final boolean asToggle; // drawn as the ✓/✗ feature toggle (a category gate, or a named feature leaf)
+    private final boolean asToggle; // drawn as the check/cross feature toggle (a category gate, or a named feature leaf)
     private final Component title;
     @Nullable
     private final Component description;
@@ -61,7 +60,7 @@ class OptionRow extends ConfigListRow {
         this.title = value.title();
         this.description = value.description();
         this.editable = !(value instanceof ConfigOption.UnsupportedValue);
-        // both the category "enabled" gate and a named feature leaf render as the ✓/✗ toggle (icon beside the symbol)
+        // both the category "enabled" gate and a named feature leaf render as the check/cross toggle
         this.asToggle = isGate || (value instanceof ConfigOption.BooleanValue bv && bv.isFeature());
         this.control = asToggle
                 ? ConfigControllers.featureToggle((ConfigOption.BooleanValue) value, session, this::onEdited)
@@ -97,39 +96,37 @@ class OptionRow extends ConfigListRow {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int index, int top, int left, int width, int height,
-                       int mouseX, int mouseY, boolean hovering, float partialTick) {
+    public void extractContent(GuiGraphicsExtractor graphics, int mouseX, int mouseY, boolean hovering, float partialTick) {
+        int top = this.getY(), left = this.getX(), width = this.getWidth(), height = this.getHeight();
         Font font = view.font();
         int cy = top + (height - CONTROL_HEIGHT) / 2;
-        // greyed while the owning category's feature toggle (or an ancestor's) is off; the gate row itself only
-        // dims when an ANCESTOR is off, so turning it off doesn't grey out (and lock away) its own switch
+        // greyed while the owning category's feature toggle (or an ancestor's) is off. The gate row itself only dims
+        // when an ancestor is off, so turning it off doesn't lock away its own switch
         boolean contextEnabled = owner == null || (isGate ? view.areAncestorsEnabled(owner) : view.isCategoryEnabled(owner));
 
         int resetX = left + width - resetButton.getWidth();
         resetButton.setX(resetX);
         resetButton.setY(cy);
         resetButton.active = editable && contextEnabled && !Objects.equals(session.currentRaw(value), value.defaultValue());
-        resetButton.render(graphics, mouseX, mouseY, partialTick);
+        resetButton.extractRenderState(graphics, mouseX, mouseY, partialTick);
 
         AbstractWidget w = control.widget();
         w.active = editable && contextEnabled;
         int controlX = resetX - GAP - w.getWidth();
         w.setX(controlX);
         w.setY(top + (height - w.getHeight()) / 2);
-        w.render(graphics, mouseX, mouseY, partialTick);
+        w.extractRenderState(graphics, mouseX, mouseY, partialTick);
 
         int textLeft = left;
         if (hasDescription()) {
             boolean expanded = session.isExpanded(value);
-            ResourceLocation arrow = expanded ? SECTION_EXPANDED_ICON : SECTION_COLLAPSED_ICON;
+            Identifier arrow = expanded ? SECTION_EXPANDED_ICON : SECTION_COLLAPSED_ICON;
             int arrowSize = 7;
-            if (!contextEnabled) graphics.setColor(0.5f, 0.5f, 0.5f, 1f);
-            graphics.blitSprite(arrow, left + 2, top + (height - arrowSize) / 2, arrowSize, arrowSize);
-            if (!contextEnabled) graphics.setColor(1f, 1f, 1f, 1f);
+            graphics.blitSprite(RenderPipelines.GUI_TEXTURED, arrow, left + 2, top + (height - arrowSize) / 2,
+                    arrowSize, arrowSize, contextEnabled ? 0xFFFFFFFF : 0xFF808080);
             textLeft = left + ARROW_WIDTH;
         }
-        // decorative, hover-animated item/block icon just before the label, if this value declares one. Feature
-        // toggles draw their icon inside the control (next to the ✓/✗ symbol) instead, so skip it here for them.
+        // decorative hover-animated icon before the label. Feature toggles draw theirs inside the control instead
         if (!asToggle && ConfigScreenIcons.has(value.icon())) {
             iconAnim.update(hovering);
             ConfigScreenIcons.renderAnimated(graphics, value.icon(), textLeft, top + (height - ROW_ICON) / 2,
@@ -138,13 +135,13 @@ class OptionRow extends ConfigListRow {
         }
         int textRight = controlX - GAP;
 
-        // reload/restart hint icon: pure decoration in the far-left gutter, never shifts the row content
+        // pure decoration in the far-left gutter, never shifts the row content
         this.reloadIconX0 = this.reloadIconX1 = -1;
-        ResourceLocation reloadIcon = ConfigScreenLayout.reloadIcon(value.reloadType());
+        Identifier reloadIcon = ConfigScreenLayout.reloadIcon(value.reloadType());
         if (reloadIcon != null) {
             int iconSize = 8; // native size of the world_reload / game_restart sprites (pixel-perfect)
             int iconX = left - iconSize - 3;
-            graphics.blitSprite(reloadIcon, iconX, top + (height - iconSize) / 2, iconSize, iconSize);
+            graphics.blitSprite(RenderPipelines.GUI_TEXTURED, reloadIcon, iconX, top + (height - iconSize) / 2, iconSize, iconSize);
             this.reloadIconX0 = iconX;
             this.reloadIconX1 = iconX + iconSize;
         }
@@ -160,14 +157,16 @@ class OptionRow extends ConfigListRow {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x(), mouseY = event.y();
+        int button = event.button();
         if (hasDescription() && button == 0
                 && mouseX >= toggleX0 && mouseX < toggleX1 && mouseY >= rowY0 && mouseY < rowY1) {
             GuiHelper.playClickSound();
             view.toggleExpanded(value);
             return true;
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(event, doubleClick);
     }
 
     @Override

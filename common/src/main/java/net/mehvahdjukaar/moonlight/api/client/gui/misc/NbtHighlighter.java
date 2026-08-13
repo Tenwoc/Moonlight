@@ -5,9 +5,9 @@ import net.mehvahdjukaar.moonlight.api.client.gui.widget.SyntaxEditBox;
 import java.util.Arrays;
 
 /**
- * Very small, line-by-line SNBT (stringified NBT) syntax colorer (pairs with {@link SyntaxEditBox}, like
- * {@link JsonHighlighter}). SNBT is JSON-shaped but with unquoted keys, single- or double-quoted strings, numeric
- * type suffixes ({@code 10b}, {@code 1.5f}, {@code 20L}) and array type markers ({@code [B;}, {@code [I;}, {@code [L;}).
+ * Very small, line-by-line SNBT (stringified NBT) syntax colorer (pairs with SyntaxEditBox, like
+ * JsonHighlighter). SNBT is JSON-shaped but with unquoted keys, single- or double-quoted strings, numeric
+ * type suffixes (10b, 1.5f, 20L) and array type markers ([B;, [I;, [L;).
  * Tokenizing per line (no cross-line state) is enough for a "basic" highlight; it's a coloring scan, not a parser.
  */
 public final class NbtHighlighter implements SyntaxHighlighter {

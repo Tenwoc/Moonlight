@@ -4,13 +4,14 @@ import net.mehvahdjukaar.moonlight.api.client.gui.GuiHelper;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -25,11 +26,11 @@ class ConfigHolderRow extends ConfigListRow {
     private final Component label;
     @Nullable
     private final Component subtitle;
-    private final ResourceLocation icon;
+    private final Identifier icon;
     private final List<AbstractWidget> children;
 
     ConfigHolderRow(Component label, @Nullable Component subtitle,
-                    ResourceLocation icon, Runnable onClick) {
+                    Identifier icon, Runnable onClick) {
         this.label = label;
         this.subtitle = subtitle;
         this.icon = icon;
@@ -39,22 +40,22 @@ class ConfigHolderRow extends ConfigListRow {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int index, int top, int left, int width, int height,
-                       int mouseX, int mouseY, boolean hovering, float partialTick) {
+    public void extractContent(GuiGraphicsExtractor graphics, int mouseX, int mouseY, boolean hovering, float partialTick) {
+        int top = this.getY(), left = this.getX(), width = this.getWidth(), height = this.getHeight();
         Font font = Minecraft.getInstance().font;
         button.setMessage(Component.empty());
         button.setX(left);
         button.setWidth(width);
         button.setY(top);
         button.setHeight(height);
-        button.render(graphics, mouseX, mouseY, partialTick);
+        button.extractRenderState(graphics, mouseX, mouseY, partialTick);
 
         int iconX = left + 8;
         int textLeft = iconX + ROW_ICON + 6;
         int editX = left + width - 8 - ROW_ICON;
         int textRight = editX - GAP;
 
-        graphics.blitSprite(icon, iconX, subtitle != null ? top + 5 : top + (height - ROW_ICON) / 2, ROW_ICON, ROW_ICON);
+        graphics.blitSprite(RenderPipelines.GUI_TEXTURED, icon, iconX, subtitle != null ? top + 5 : top + (height - ROW_ICON) / 2, ROW_ICON, ROW_ICON);
         Component boldLabel = label.copy();//.withStyle(ChatFormatting.BOLD);
         if (subtitle != null) {
             GuiHelper.renderScrollingText(graphics, font, boldLabel, textLeft, textRight, top + 3, font.lineHeight + 2, CATEGORY);
@@ -62,7 +63,7 @@ class ConfigHolderRow extends ConfigListRow {
         } else {
             GuiHelper.renderScrollingText(graphics, font, boldLabel, textLeft, textRight, top, height, CATEGORY);
         }
-        graphics.blitSprite(EDIT_ICON, editX, top + (height - ROW_ICON) / 2, ROW_ICON, ROW_ICON);
+        graphics.blitSprite(RenderPipelines.GUI_TEXTURED, EDIT_ICON, editX, top + (height - ROW_ICON) / 2, ROW_ICON, ROW_ICON);
     }
 
     @Override

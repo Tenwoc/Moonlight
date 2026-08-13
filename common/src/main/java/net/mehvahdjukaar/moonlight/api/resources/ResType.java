@@ -1,7 +1,7 @@
 package net.mehvahdjukaar.moonlight.api.resources;
 
 
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.tags.TagKey;
 
 public enum ResType {
@@ -29,6 +29,8 @@ public enum ResType {
     MODELS("models/%s.json"),
     BLOCK_MODELS("models/block/%s.json"),
     ITEM_MODELS("models/item/%s.json"),
+    //item model definitions, the thing that picks which model an item stack shows. models/item only holds geometry
+    ITEMS("items/%s.json"),
     BLOCKSTATES("blockstates/%s.json"),
     PARTICLES("particles/%s.json"),
     MOB_EFFECT_TEXTURES("mob_effect/%s.json"),
@@ -42,16 +44,16 @@ public enum ResType {
     }
 
 
-    public ResourceLocation getPath(ResourceLocation relativeLocation) {
+    public Identifier getPath(Identifier relativeLocation) {
         return relativeLocation.withPath(String.format(this.loc, relativeLocation.getPath()));
     }
 
-    public ResourceLocation getPath(String relativeLocation) {
-        return this.getPath(ResourceLocation.parse(relativeLocation));
+    public Identifier getPath(String relativeLocation) {
+        return this.getPath(Identifier.parse(relativeLocation));
     }
 
-    public static ResourceLocation getTagPath(TagKey<?> tag) {
-        return TAGS.getPath(tag.location().withPrefix(tag.registry().location().getPath() + "/"));
+    public static Identifier getTagPath(TagKey<?> tag) {
+        return TAGS.getPath(tag.location().withPrefix(tag.registry().identifier().getPath() + "/"));
     }
 
 }

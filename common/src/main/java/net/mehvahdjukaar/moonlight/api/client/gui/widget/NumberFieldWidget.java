@@ -4,13 +4,14 @@ import net.mehvahdjukaar.moonlight.api.client.gui.GuiHelper;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
-import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 import java.util.List;
 import java.util.function.DoubleConsumer;
@@ -20,8 +21,8 @@ import static net.mehvahdjukaar.moonlight.api.client.gui.GuiHelper.formatNumber;
 
 public class NumberFieldWidget extends CompositeWidget {
 
-    private static final ResourceLocation FIELD = ResourceLocation.withDefaultNamespace("widget/text_field");
-    private static final ResourceLocation FIELD_FOCUSED = ResourceLocation.withDefaultNamespace("widget/text_field_highlighted");
+    private static final Identifier FIELD = Identifier.withDefaultNamespace("widget/text_field");
+    private static final Identifier FIELD_FOCUSED = Identifier.withDefaultNamespace("widget/text_field_highlighted");
 
     private static final String MINUS = "-";
     private static final String PLUS = "+";
@@ -49,10 +50,10 @@ public class NumberFieldWidget extends CompositeWidget {
         this.step = integer ? 1 : 0.1;
 
         Font font = Minecraft.getInstance().font;
-        // built at its final width so a short number doesn't start scrolled out of view. A plain edit box, not the
+        // Built at its final width so a short number doesn't start scrolled out of view. A plain edit box and not the
         // panning one: numbers are short, and its marquee centers text by its own rule, which would fight textY().
-        // The height runs from the text down to the widget's bottom edge, so clicking the number focuses it without
-        // the box reaching past the frame
+        // The height runs from the text down to the bottom edge, so clicking the number focuses it without the box
+        // reaching past the frame
         this.box = new EditBox(font, 0, 0, innerWidth(width), height - (height - GLYPH_H) / 2, Component.empty());
         this.box.setBordered(false); // this widget draws the frame, spanning the step zones too
         this.box.setMaxLength(Short.MAX_VALUE);
@@ -69,17 +70,16 @@ public class NumberFieldWidget extends CompositeWidget {
         return width - 2 * (STEP_W + 1 + TEXT_PAD);
     }
 
-    /** Drawn width of a glyph: {@link Font#width} counts the trailing spacing column, which would bias the centering. */
+    // drawn width of a glyph. Font#width counts the trailing spacing column, which would bias the centering
     private static int glyphWidth(Font font, String glyph) {
         return font.width(glyph) - 1;
     }
 
-    /** Top of every glyph in the widget, arrows and number alike, so they sit on one line. */
+    // top of every glyph in the widget, arrows and number alike, so they sit on one line
     private static int textY(int y, int height) {
         return y + (height - GLYPH_H) / 2;
     }
 
-    /** Pushes a value into the field (the row's reset button). */
     public void setValue(double v) {
         this.box.setValue(format(v));
     }
@@ -99,7 +99,7 @@ public class NumberFieldWidget extends CompositeWidget {
         return formatNumber(Math.round(v * 10000d) / 10000d);
     }
 
-    /** The value a step starts from: whatever is typed if it's valid, else the nearest bound of the range. */
+    // the value a step starts from: whatever is typed if valid, else the nearest bound of the range
     private double currentOrNearest() {
         Double parsed = parse(box.getValue());
         if (parsed != null) return parsed;
@@ -115,7 +115,7 @@ public class NumberFieldWidget extends CompositeWidget {
 
     private void step(int dir) {
         double from = currentOrNearest();
-        double next = Math.clamp(from + dir * step * (Screen.hasShiftDown() ? SHIFT_MULTIPLIER : 1), min, max);
+        double next = Math.clamp(from + dir * step * (Minecraft.getInstance().hasShiftDown() ? SHIFT_MULTIPLIER : 1), min, max);
         if (next == from && parse(box.getValue()) != null) return;
         this.box.setValue(format(next)); // the responder commits it
         GuiHelper.playClickSound();
@@ -133,22 +133,22 @@ public class NumberFieldWidget extends CompositeWidget {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 0 && this.active) {
-            int dir = overStep(mouseX, mouseY, -1) ? -1 : overStep(mouseX, mouseY, 1) ? 1 : 0;
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        if (event.button() == 0 && this.active) {
+            int dir = overStep(event.x(), event.y(), -1) ? -1 : overStep(event.x(), event.y(), 1) ? 1 : 0;
             if (dir != 0) {
                 if (canStep(dir)) step(dir);
                 return true; // eat the click either way, the arrow is not a hole in the widget
             }
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(event, doubleClick);
     }
 
     @Override
-    protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+    protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         int x = getX(), y = getY(), w = getWidth(), h = getHeight();
         boolean focused = this.box.isFocused();
-        graphics.blitSprite(focused ? FIELD_FOCUSED : FIELD, x, y, w, h);
+        graphics.blitSprite(RenderPipelines.GUI_TEXTURED, focused ? FIELD_FOCUSED : FIELD, x, y, w, h);
 
         // the two 1px dividers, and with them the three bands: [border|minus|div|number|div|plus|border]
         int leftDivider = x + STEP_W;
@@ -159,23 +159,23 @@ public class NumberFieldWidget extends CompositeWidget {
 
         Font font = Minecraft.getInstance().font;
         int textY = textY(y, h);
-        // each arrow is inset from its own outer edge by the same amount, mirrored, so an odd leftover pixel lands
-        // on the same side of both and they read as a pair. No shadow: these are chrome, not label text
+        // each arrow is inset from its own outer edge by the same mirrored amount, so an odd leftover pixel lands on
+        // the same side of both and they read as a pair. No shadow: these are chrome, not label text
         int minusW = glyphWidth(font, MINUS);
         int plusW = glyphWidth(font, PLUS);
-        graphics.drawString(font, MINUS, x + 1 + (STEP_W - 1 - minusW) / 2, textY,
+        graphics.text(font, MINUS, x + 1 + (STEP_W - 1 - minusW) / 2, textY,
                 arrowColor(mouseX, mouseY, -1), false);
-        graphics.drawString(font, PLUS, x + w - 1 - (STEP_W - 1 - plusW) / 2 - plusW, textY,
+        graphics.text(font, PLUS, x + w - 1 - (STEP_W - 1 - plusW) / 2 - plusW, textY,
                 arrowColor(mouseX, mouseY, 1), false);
 
-        // the number is centered in the band between the dividers, falling back to left aligned once it no longer
-        // fits. An unbordered edit box draws its text at its own y (only a bordered one centers), hence textY here
+        // the number is centered between the dividers, falling back to left aligned once it no longer fits. An
+        // unbordered edit box draws its text at its own y, only a bordered one centers, hence textY here
         int fieldStart = leftDivider + 1 + TEXT_PAD;
         int fieldWidth = rightDivider - TEXT_PAD - fieldStart;
         int slack = Math.max(0, fieldWidth - font.width(this.box.getValue()));
         this.box.setPosition(fieldStart + slack / 2, textY);
         this.box.setWidth(fieldWidth - slack / 2);
-        this.box.render(graphics, mouseX, mouseY, partialTick);
+        this.box.extractRenderState(graphics, mouseX, mouseY, partialTick);
     }
 
     @Override

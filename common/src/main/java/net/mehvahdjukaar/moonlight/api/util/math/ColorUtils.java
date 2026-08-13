@@ -7,7 +7,7 @@ import net.mehvahdjukaar.codecui.SchemaCodecs;
 import net.mehvahdjukaar.moonlight.api.util.math.colors.HSVColor;
 import net.mehvahdjukaar.moonlight.api.util.math.colors.RGBColor;
 import net.minecraft.core.Direction;
-import net.minecraft.util.FastColor;
+import net.minecraft.util.ARGB;
 import org.joml.Vector3f;
 
 import java.util.Locale;
@@ -18,7 +18,7 @@ public final class ColorUtils {
     //wrapped as an ARGB color SchemaCodec so codecui-driven editors render a color picker (serialization is unchanged)
     public static final Codec<Integer> CODEC = SchemaCodecs.colorArgb(hexOrIntCodec(true));
 
-    /** RGB variant of {@link #CODEC}: alpha bits are dropped and colors serialize as {@code #RRGGBB}. */
+    /** RGB variant of CODEC: alpha bits are dropped and colors serialize as #RRGGBB. */
     public static final Codec<Integer> RGB_CODEC = SchemaCodecs.colorRgb(
             hexOrIntCodec(false).xmap(i -> i & 0xFFFFFF, i -> i & 0xFFFFFF));
 
@@ -65,21 +65,21 @@ public final class ColorUtils {
     }
 
     /**
-     * Parses an ARGB color from a hex string (accepts {@code 0x}, {@code #} or no prefix). Throws if invalid.
+     * Parses an ARGB color from a hex string (accepts 0x, # or no prefix). Throws if invalid.
      */
     public static int parseHex(String s) {
         return Integer.parseUnsignedInt(isValidStringOrError(s).getOrThrow(), 16);
     }
 
     /**
-     * Formats an ARGB color as an {@code #AARRGGBB} hex string.
+     * Formats an ARGB color as an #AARRGGBB hex string.
      */
     public static String toHexString(int argb) {
         return "#" + String.format("%08X", argb);
     }
 
     /**
-     * Formats a color as a hex string, either {@code #AARRGGBB} (with alpha) or {@code #RRGGBB} (without).
+     * Formats a color as a hex string, either #AARRGGBB (with alpha) or #RRGGBB (without).
      */
     public static String toHexString(int color, boolean hasAlpha) {
         return hasAlpha
@@ -88,7 +88,7 @@ public final class ColorUtils {
     }
 
     /**
-     * Builds an ARGB color from HSV components (all {@code 0..1}) and an {@code 0..255} alpha, via {@link HSVColor}.
+     * Builds an ARGB color from HSV components (all 0..1) and an 0..255 alpha, via HSVColor.
      */
     public static int hsvToArgb(float hue, float saturation, float value, int alpha) {
         // HSVColor/RGBColor pack ABGR; our config colors are ARGB, so swap on the way out
@@ -96,8 +96,8 @@ public final class ColorUtils {
     }
 
     /**
-     * Extracts the HSV components ({@code {hue, saturation, value}}, all {@code 0..1}) of an ARGB color, via
-     * {@link HSVColor}. Alpha is ignored; read it separately (e.g. {@code FastColor.ARGB32.alpha}).
+     * Extracts the HSV components ({hue, saturation, value}, all 0..1) of an ARGB color, via
+     * HSVColor. Alpha is ignored; read it separately (e.g. ARGB.alpha).
      */
     public static float[] argbToHsv(int argb) {
         HSVColor hsv = new RGBColor(swapFormat(argb)).asHSV();
@@ -129,10 +129,10 @@ public final class ColorUtils {
     //component wise multiplication
     public static int multiply(int color, float amount) {
         if (amount == 1) return color;
-        int j = Math.min(255, (int) (FastColor.ABGR32.red(color) * amount));
-        int k = Math.min(255, (int) (FastColor.ABGR32.green(color) * amount));
-        int l = Math.min(255, (int) (FastColor.ABGR32.blue(color) * amount));
-        return FastColor.ABGR32.color(0, l, k, j);
+        int r = Math.min(255, (int) (ARGB.red(color) * amount));
+        int g = Math.min(255, (int) (ARGB.green(color) * amount));
+        int b = Math.min(255, (int) (ARGB.blue(color) * amount));
+        return ARGB.color(0, r, g, b);
     }
 
     public static int lerp(int c0, int c1, float t) {
@@ -150,10 +150,11 @@ public final class ColorUtils {
     }
 
     public static int pack(float[] rgb) {
-        return FastColor.ARGB32.color(255, (int) (rgb[0] * 255), (int) (rgb[1] * 255), (int) (rgb[2] * 255));
+        return ARGB.color(255, (int) (rgb[0] * 255), (int) (rgb[1] * 255), (int) (rgb[2] * 255));
     }
 
     public static float[] unpack(int color) {
-        return new float[]{FastColor.ABGR32.red(color) / 255f, FastColor.ABGR32.green(color) / 255f, FastColor.ABGR32.blue(color) / 255f};
+        int argb = ARGB.fromABGR(color);
+        return new float[]{ARGB.red(argb) / 255f, ARGB.green(argb) / 255f, ARGB.blue(argb) / 255f};
     }
 }

@@ -17,7 +17,7 @@ neoForge {
 val codecui_version: String by extra
 
 dependencies {
-    // Declarative codec schema API — runtime dep + bundled (JiJ) into the shipped jar.
+    // Declarative codec schema API - runtime dep + bundled (JiJ) into the shipped jar.
     implementation("net.mehvahdjukaar:codecui-neoforge:${codecui_version}")
     jarJar("net.mehvahdjukaar:codecui-neoforge:${codecui_version}")
 

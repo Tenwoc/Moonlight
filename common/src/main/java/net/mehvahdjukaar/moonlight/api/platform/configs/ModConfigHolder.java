@@ -11,7 +11,7 @@ import net.mehvahdjukaar.moonlight.core.Moonlight;
 import net.mehvahdjukaar.moonlight.core.network.SyncConfigsMessage;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.players.PlayerList;
@@ -29,7 +29,7 @@ import java.util.function.Supplier;
 
 public abstract class ModConfigHolder {
 
-    private static final Map<ResourceLocation, ModConfigHolder> CONFIG_STORAGE = new ConcurrentHashMap<>(); //wack. multithreading mod loading
+    private static final Map<Identifier, ModConfigHolder> CONFIG_STORAGE = new ConcurrentHashMap<>(); //wack. multithreading mod loading
 
     public static void addTrackedSpec(ModConfigHolder spec) {
         var old = CONFIG_STORAGE.put(spec.getId(), spec);
@@ -43,28 +43,27 @@ public abstract class ModConfigHolder {
     }
 
     @Nullable
-    public static ModConfigHolder getConfigSpec(ResourceLocation configId) {
+    public static ModConfigHolder getConfigSpec(Identifier configId) {
         return CONFIG_STORAGE.get(configId);
     }
 
-    private final ResourceLocation configId;
+    private final Identifier configId;
     private final String fileName;
     private final Component readableName;
     private final Path filePath;
     private final ConfigType type;
     @Nullable
     private final Runnable changeCallback;
-    // feature (short name and full path) -> effective enabled supplier, collected by the builder (see
-    // ConfigBuilder.feature/mainFeature) and stamped in at build(). Lets mods gate content by feature name.
+    // feature (short name and full path) -> effective enabled supplier, stamped in by the builder at build()
     private Map<String, Supplier<Boolean>> featureToggles = Map.of();
 
-    protected ModConfigHolder(ResourceLocation id, String fileExtension, Path configDirectory, ConfigType type, @Nullable Runnable changeCallback) {
+    protected ModConfigHolder(Identifier id, String fileExtension, Path configDirectory, ConfigType type, @Nullable Runnable changeCallback) {
         this(id, fileExtension, configDirectory, type, changeCallback, true);
     }
 
-    // tracked=false is for holders that only mirror another mod's config (the foreign-config bridge): they must not
-    // join the global registry, both to avoid a duplicate-id clash on re-open and to stay out of sync/enumeration logic
-    protected ModConfigHolder(ResourceLocation id, String fileExtension, Path configDirectory, ConfigType type, @Nullable Runnable changeCallback, boolean tracked) {
+    // untracked holders only mirror another mod's config (the foreign-config bridge). They stay out of the global
+    // registry, both to avoid a duplicate-id clash on re-open and to stay out of sync/enumeration logic
+    protected ModConfigHolder(Identifier id, String fileExtension, Path configDirectory, ConfigType type, @Nullable Runnable changeCallback, boolean tracked) {
         this.configId = id;
         this.fileName = id.getNamespace() + "-" + id.getPath() + "." + fileExtension;
         this.filePath = configDirectory.resolve(fileName);
@@ -79,24 +78,23 @@ public abstract class ModConfigHolder {
         return readableName;
     }
 
-    /** Internal: the builder hands over its collected feature registry at build time. */
+    // the builder hands over its collected feature registry at build time
     @ApiStatus.Internal
     public void setFeatureToggles(Map<String, Supplier<Boolean>> featureToggles) {
         this.featureToggles = Map.copyOf(featureToggles);
     }
 
     /**
-     * Whether the {@code feature(...)}/{@code mainFeature(...)} toggle with the given name is currently on. Accepts
-     * either the feature's short name or its full dotted path (e.g. {@code "speaker_block"} or
-     * {@code "redstone.speaker_block"}). Returns {@code true} for an unknown name, so content not gated by a feature
-     * is enabled by default. The value composes ancestor gates, so it reads {@code false} when a parent feature is off.
+     * Whether the feature(...) toggle with the given name is on. Accepts either the short name or the full
+     * dotted path ("speaker_block" or "redstone.speaker_block"), and returns true for an unknown one
+     * so ungated content stays enabled. Composes ancestor gates, so it reads false when a parent feature is off.
      */
     public boolean isFeatureEnabled(String nameOrPath) {
         Supplier<Boolean> toggle = this.featureToggles.get(nameOrPath);
         return toggle == null || Boolean.TRUE.equals(toggle.get());
     }
 
-    /** The raw feature registry (short name and full path keys -> effective enabled supplier). */
+    /** Short name and full path keys -> effective enabled supplier. */
     public Map<String, Supplier<Boolean>> getFeatureToggles() {
         return this.featureToggles;
     }
@@ -121,7 +119,7 @@ public abstract class ModConfigHolder {
         return configId.getNamespace();
     }
 
-    public ResourceLocation getId() {
+    public Identifier getId() {
         return configId;
     }
 
@@ -135,11 +133,8 @@ public abstract class ModConfigHolder {
     }
 
     /**
-     * Writes a new (already validated) value to a config handle and saves it. {@code config} is the object a
-     * {@code define(...)} returned; it is exposed to mods as a read-only {@link Supplier} but is always really one of
-     * ours ({@link IConfigValue}), so this recovers that type with a single boundary cast rather than an
-     * {@code instanceof} chain. Invalidates this config's pack cache when the write actually changed a pack-affecting
-     * value. Shared by both loaders; only {@link #persist()} differs.
+     * Writes a new (already validated) value to a handle a define(...) returned and saves it. Such a handle is
+     * exposed to mods as a read-only Supplier but is always really an IConfigValue, hence the cast.
      */
     public <T> void manuallySetValue(Supplier<T> config, T value) {
         if (!(config instanceof IConfigValue<T> handle)) {
@@ -151,7 +146,7 @@ public abstract class ModConfigHolder {
         this.persist();
     }
 
-    /** Flushes the whole config to disk after a manual edit (spec save on NeoForge, json write on Fabric). */
+    /** Flushes the whole config to disk (spec save on NeoForge, json write on Fabric). */
     protected abstract void persist();
 
     public String getFileName() {
@@ -172,12 +167,11 @@ public abstract class ModConfigHolder {
 
     @Nullable
     @ClientOnly
-    public abstract Screen makeScreen(Screen parent, @Nullable ResourceLocation background);
+    public abstract Screen makeScreen(Screen parent, @Nullable Identifier background);
 
     /**
-     * Loader independent, server safe description of this config as a navigable tree. The client side
-     * {@code MoonlightConfigScreen} consumes it; this base class never references the screen so the holder stays
-     * server safe. Returns null if this holder doesn't expose one.
+     * Loader independent, server safe description of this config as a navigable tree, consumed by the client side
+     * config screen. Null if this holder doesn't expose one.
      */
     @Nullable
     public ConfigCategory getConfigRoot() {

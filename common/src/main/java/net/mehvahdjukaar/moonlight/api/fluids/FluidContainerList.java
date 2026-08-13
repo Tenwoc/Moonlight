@@ -103,7 +103,7 @@ public class FluidContainerList implements Iterable<FluidContainerList.Category>
     public static class Category {
 
         private static final Supplier<Category> EMPTY = Suppliers.memoize(() ->
-                new Category(BuiltInRegistries.ITEM.get(BuiltInRegistries.ITEM.getDefaultKey()), 1));
+                new Category(BuiltInRegistries.ITEM.getValue(BuiltInRegistries.ITEM.getDefaultKey()), 1));
 
         public static final Codec<Category> CODEC = RecordCodecBuilder.create((instance) -> instance.group(
                 BuiltInRegistries.ITEM.byNameCodec().fieldOf("empty").forGetter(c -> c.emptyContainer),
@@ -154,11 +154,6 @@ public class FluidContainerList implements Iterable<FluidContainerList.Category>
          * @return amount of liquid contained in this item in bottles
          */
         public int getCapacity() {
-            return containerCapacity;
-        }
-
-        @Deprecated(forRemoval = true)
-        public int getAmount() {
             return containerCapacity;
         }
 

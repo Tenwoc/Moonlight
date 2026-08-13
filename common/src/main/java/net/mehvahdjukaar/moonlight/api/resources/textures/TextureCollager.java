@@ -26,7 +26,6 @@ public class TextureCollager {
 
         String debugInfo = "Source='" + source.debugPath + "', Dest='" + destination.debugPath + "'";
 
-        // --- Fail fast sanity checks ---
         if (source.frameCount() <= 0) {
             throw new IllegalStateException("Source TextureImage has no frames: " + debugInfo);
         }
@@ -35,11 +34,11 @@ public class TextureCollager {
         }
         if (originFrameW <= 0 || originFrameH <= 0) {
             throw new IllegalStateException("TextureCollager origin frame dimensions invalid: "
-                    + originFrameW + "x" + originFrameH + " — " + debugInfo);
+                    + originFrameW + "x" + originFrameH + " - " + debugInfo);
         }
         if (targetFrameW <= 0 || targetFrameH <= 0) {
             throw new IllegalStateException("TextureCollager target frame dimensions invalid: "
-                    + targetFrameW + "x" + targetFrameH + " — " + debugInfo);
+                    + targetFrameW + "x" + targetFrameH + " - " + debugInfo);
         }
 
         float scaleSourceX = source.frameWidth() / (float) originFrameW;
@@ -69,14 +68,13 @@ public class TextureCollager {
                 int scaledTargetW = Math.round(op.targetW * scaleTargetX);
                 int scaledTargetH = Math.round(op.targetH * scaleTargetY);
 
-                // --- Validate bounds with debug logging ---
                 if (scaledSourceW <= 0 || scaledSourceH <= 0) {
                     throw new IllegalStateException("Scaled source rectangle invalid: " +
-                            scaledSourceW + "x" + scaledSourceH + " — " + debugInfo + ", op=" + op);
+                            scaledSourceW + "x" + scaledSourceH + " - " + debugInfo + ", op=" + op);
                 }
                 if (scaledTargetW <= 0 || scaledTargetH <= 0) {
                     throw new IllegalStateException("Scaled target rectangle invalid: " +
-                            scaledTargetW + "x" + scaledTargetH + " — " + debugInfo + ", op=" + op);
+                            scaledTargetW + "x" + scaledTargetH + " - " + debugInfo + ", op=" + op);
                 }
 
                 if (scaledSourceX < 0 || scaledSourceY < 0
@@ -84,7 +82,7 @@ public class TextureCollager {
                         || scaledSourceY + scaledSourceH > source.frameHeight()) {
                     throw new IllegalStateException("Source operation rectangle out of bounds: " +
                             scaledSourceX + "," + scaledSourceY + "," + scaledSourceW + "," + scaledSourceH +
-                            " — " + debugInfo + ", op=" + op);
+                            " - " + debugInfo + ", op=" + op);
                 }
 
                 if (scaledTargetX < 0 || scaledTargetY < 0
@@ -92,7 +90,7 @@ public class TextureCollager {
                         || scaledTargetY + scaledTargetH > destination.frameHeight()) {
                     throw new IllegalStateException("Target operation rectangle out of bounds: " +
                             scaledTargetX + "," + scaledTargetY + "," + scaledTargetW + "," + scaledTargetH +
-                            " — " + debugInfo + ", op=" + op);
+                            " - " + debugInfo + ", op=" + op);
                 }
 
                 Sampler2D sampler = Sampler2D.offset(sourceFrameSampler, scaledSourceX, scaledSourceY);
@@ -124,7 +122,7 @@ public class TextureCollager {
 
                 if (actualW <= 0 || actualH <= 0) {
                     throw new IllegalStateException("Operation would write zero or negative pixel area: " +
-                            "actualW=" + actualW + ", actualH=" + actualH + " — " + debugInfo + ", op=" + op);
+                            "actualW=" + actualW + ", actualH=" + actualH + " - " + debugInfo + ", op=" + op);
                 }
 
                 for (int ty = 0; ty < actualH; ty++) {

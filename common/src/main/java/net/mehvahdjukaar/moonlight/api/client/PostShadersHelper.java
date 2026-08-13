@@ -1,199 +1,101 @@
 package net.mehvahdjukaar.moonlight.api.client;
 
-import com.google.gson.JsonSyntaxException;
 import com.mojang.blaze3d.pipeline.RenderTarget;
+import com.mojang.blaze3d.resource.GraphicsResourceAllocator;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.LevelTargetBundle;
 import net.minecraft.client.renderer.PostChain;
-import net.minecraft.client.renderer.texture.TextureManager;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.server.packs.resources.ResourceProvider;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.client.renderer.ShaderManager;
+import net.minecraft.resources.Identifier;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.IOException;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
- * Allows one to add and remove Post Shader effects in an ordered, grouped, and non-destructive way
+ * Lets several post effects be active at once, in a defined order, each owned by its own group so mods don't
+ * clobber each other. Vanilla only has room for a single post effect id at a time
+ * (net.minecraft.client.renderer.GameRenderer.setPostEffect), which is the whole reason this exists.
+ * <p>
+ * Effect ids are the same ones vanilla uses, i.e. the path of a post_effect/<id>.json definition.
  */
 public class PostShadersHelper {
 
-    public record Group(ResourceLocation id, float priority) {
-        public static final Group DEFAULT = new Group(ResourceLocation.withDefaultNamespace("default"), 0);
-        public static final Group SPECTATOR_SHADERS = new Group(ResourceLocation.withDefaultNamespace("spectator_shaders"), 1);
+    public record Group(Identifier id, float priority) {
+        public static final Group DEFAULT = new Group(Identifier.withDefaultNamespace("default"), 0);
+        public static final Group SPECTATOR_SHADERS = new Group(Identifier.withDefaultNamespace("spectator_shaders"), 1);
     }
 
     /**
-     * Use instead of loadEffect.
-     * This allows adding a post-effect in a non-destructive manner, allowing multiple mods to work together.
-     *
-     * @param newPost post-effect. Null to remove it
-     * @param group      effect group. Used for priority and mutual exclusivity.
+     * Effects applied to the main screen after the level is drawn, on top of whatever post effect vanilla itself
+     * has active. Add to it with toggleEffect.
      */
-    public static void toggleEffect(@Nullable ResourceLocation newPost, Group group) {
-        GameRenderer gr = Minecraft.getInstance().gameRenderer;
-        try {
-            RenderTarget target = gr.postEffect != null ? gr.postEffect.screenTarget : Minecraft.getInstance().getMainRenderTarget();
-            gr.postEffect = refreshComposite(gr.postEffect, newPost, group, target);
-            gr.effectActive = gr.postEffect != null;
-        } catch (IOException ioexception) {
-            //  LOGGER.warn("Failed to load shader: {}", resourceLocation, ioexception);
-            gr.effectActive = false;
-        } catch (JsonSyntaxException jsonsyntaxexception) {
-            //   LOGGER.warn("Failed to parse shader: {}", resourceLocation, jsonsyntaxexception);
-            gr.effectActive = false;
+    public static final EffectStack SCREEN = new EffectStack();
+
+    /**
+     * Adds a screen post effect without clearing the ones other mods added.
+     *
+     * @param newPost post effect id. Null to remove this group's effect
+     * @param group   effect group, used for priority and mutual exclusivity
+     */
+    public static void toggleEffect(@Nullable Identifier newPost, Group group) {
+        SCREEN.toggle(newPost, group);
+    }
+
+    /**
+     * An ordered set of post effects, at most one per group. Runs them back to back over a render target, which
+     * gives the same result as vanilla's single chain applied repeatedly.
+     * Use your own instance to post process an offscreen target rather than the screen.
+     */
+    public static class EffectStack {
+
+        private final Map<Group, Identifier> byGroup = new HashMap<>();
+        private List<Identifier> ordered = List.of();
+
+        /**
+         * @param effect effect id, or null to clear this group
+         * @return true if the stack actually changed
+         */
+        public boolean toggle(@Nullable Identifier effect, Group group) {
+            Identifier old = effect == null ? byGroup.remove(group) : byGroup.put(group, effect);
+            if (Objects.equals(old, effect)) return false;
+            this.ordered = byGroup.entrySet().stream()
+                    .sorted(Comparator.comparingDouble(e -> e.getKey().priority()))
+                    .map(Map.Entry::getValue)
+                    .toList();
+            return true;
+        }
+
+        public boolean isEmpty() {
+            return ordered.isEmpty();
+        }
+
+        public List<Identifier> effects() {
+            return ordered;
+        }
+
+        /**
+         * Runs every effect in priority order. Effects whose definition is missing or failed to compile are skipped,
+         * same as vanilla does for its own.
+         */
+        public void process(RenderTarget target, GraphicsResourceAllocator resourcePool) {
+            if (ordered.isEmpty()) return;
+            ShaderManager shaderManager = Minecraft.getInstance().getShaderManager();
+            for (Identifier effect : ordered) {
+                PostChain chain = shaderManager.getPostChain(effect, LevelTargetBundle.MAIN_TARGETS);
+                if (chain != null) chain.process(target, resourcePool);
+            }
         }
     }
 
-    public static @Nullable PostChain refreshComposite(@Nullable PostChain currentChain,
-                                                       @Nullable ResourceLocation newPost,
-                                                       Group group, RenderTarget mainTarget) throws IOException {
-        PostChain newChain;
-        if (currentChain == null) {
-            if (newPost == null) return null;
-            newChain = ComposedPostChain.create(newPost, group, mainTarget);
-        } else if (currentChain instanceof ComposedPostChain cpc) {
-            newChain = cpc.with(newPost, group);
-        } else {
-            // Another mod set gr.postEffect directly to a non-ComposedPostChain.
-            // If passes are empty the chain was already closed (e.g. by checkEntityPostEffect before the mixin
-            // intercepted the null assignment) — treat it the same as a null chain so we don't wrap dead GL state.
-            if (currentChain.passes.isEmpty()) {
-                if (newPost == null) return null;
-                newChain = ComposedPostChain.create(newPost, group, mainTarget);
-            } else {
-                // Actively rendering external chain: absorb it as DEFAULT and apply our change on top.
-                ComposedPostChain wrapped = ComposedPostChain.wrap(currentChain, Group.DEFAULT);
-                newChain = (newPost == null) ? wrapped : wrapped.with(newPost, group);
-                if (newChain == null) newChain = wrapped;
-            }
-        }
-        return newChain;
+    @ApiStatus.Internal
+    public static void processScreenEffects(GraphicsResourceAllocator resourcePool) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) return;
+        SCREEN.process(mc.getMainRenderTarget(), resourcePool);
     }
-
-    private static final class ComposedPostChain extends PostChain {
-
-        private final Map<Group, PostChain> chainsPerGroup = new HashMap<>();
-
-        private ComposedPostChain(TextureManager textureManager, ResourceProvider resourceProvider,
-                                  RenderTarget screenTarget, ResourceLocation resourceLocation) throws IOException, JsonSyntaxException {
-            super(textureManager, resourceProvider, screenTarget, resourceLocation);
-        }
-
-
-        @Override
-        public void close() {
-            for (PostChain sub : chainsPerGroup.values()) {
-                sub.close();
-            }
-            chainsPerGroup.clear();
-            passes.clear();             // references are now dead; clear so nothing else touches them
-            customRenderTargets.clear();
-            fullSizedTargets.clear();
-        }
-
-
-        //prevent it from loading normally
-        public void load(@NotNull TextureManager textureManager, @NotNull ResourceLocation resourceLocation) throws IOException, JsonSyntaxException {
-        }
-
-        private static ComposedPostChain wrap(PostChain vanillaChain, Group group) throws IOException {
-            Minecraft mc = Minecraft.getInstance();
-            TextureManager tm = mc.getTextureManager();
-            ResourceManager rm = mc.getResourceManager();
-            var cc = new ComposedPostChain(tm, rm, vanillaChain.screenTarget, ResourceLocation.parse(vanillaChain.getName()));
-            cc.addSubChain(vanillaChain, group);
-            return cc;
-        }
-
-        private static ComposedPostChain create(ResourceLocation postEffect, Group group, RenderTarget mainTarget) throws IOException {
-            Minecraft mc = Minecraft.getInstance();
-            TextureManager tm = mc.getTextureManager();
-            ResourceManager rm = mc.getResourceManager();
-            PostChain vanillaChain = new PostChain(tm, rm, mainTarget, postEffect);
-            vanillaChain.resize(mainTarget.width, mainTarget.height);
-
-            return wrap(vanillaChain, group);
-        }
-
-        private @Nullable ComposedPostChain with(@Nullable ResourceLocation newEffect, Group group) throws IOException {
-            Minecraft mc = Minecraft.getInstance();
-            TextureManager tm = mc.getTextureManager();
-            ResourceManager rm = mc.getResourceManager();
-
-            //check if it's already good
-            if (newEffect != null) {
-                PostChain existing = this.chainsPerGroup.get(group);
-                if (existing != null && existing.getName().equals(newEffect.toString())) {
-                    return this;
-                }
-            }
-            // copy existing groups
-            Map<Group, PostChain> newGroups = new HashMap<>(this.chainsPerGroup);
-            if (newEffect == null) {
-                PostChain removed = newGroups.remove(group);
-                if (removed != null) removed.close();
-                if (newGroups.isEmpty()) {
-                    // if no groups left, return null to indicate no post-chain needed
-                    return null;
-                }
-            } else {
-                PostChain newChain = new PostChain(tm, rm, this.screenTarget, newEffect);
-                newChain.resize(this.screenTarget.width, this.screenTarget.height);
-                // Close the old sub-chain for this group if one existed, so its GL programs are freed.
-                PostChain old = newGroups.put(group, newChain);
-                if (old != null) old.close();
-            }
-
-            // sort groups by priority
-            List<Map.Entry<Group, PostChain>> ordered =
-                    newGroups.entrySet().stream()
-                            .sorted((a, b) -> Float.compare(a.getKey().priority(), b.getKey().priority()))
-                            .toList();
-
-            ResourceLocation newName = ordered.size() == 1 ?
-                    ResourceLocation.parse(ordered.getFirst().getValue().getName()) :
-                    ResourceLocation.withDefaultNamespace("composed/" +
-                            ordered.stream()
-                            .map(e -> e.getValue().getName()
-                                      .replace(":", "_"))
-                            .reduce((a, b) -> a + "_" + b).orElse("empty"));
-
-            // create new composed chain (empty base)
-            ComposedPostChain result = new ComposedPostChain(
-                    tm, rm,
-                    this.screenTarget,
-                    newName // reuse same name
-            );
-            // rebuild passes + targets in order
-            for (var entry : ordered) {
-                PostChain pc = entry.getValue();
-                result.addSubChain(pc, entry.getKey());
-            }
-
-            result.resize(this.screenTarget.width, this.screenTarget.height);
-
-            return result;
-
-        }
-
-        private void addSubChain(PostChain chain, Group group) {
-            this.chainsPerGroup.put(group, chain);
-
-            this.passes.addAll(chain.passes);
-            this.customRenderTargets.putAll(chain.customRenderTargets);
-            this.fullSizedTargets.addAll(chain.fullSizedTargets);
-
-            this.time = chain.time;
-            this.lastStamp = chain.lastStamp;
-
-
-        }
-    }
-
-
 }

@@ -5,7 +5,6 @@ import net.mehvahdjukaar.moonlight.api.item.additional_placements.BlockPlacerIte
 import net.mehvahdjukaar.moonlight.api.map.MLMapDecorationsComponent;
 import net.mehvahdjukaar.moonlight.api.misc.WorldSavedDataType;
 import net.mehvahdjukaar.moonlight.api.platform.RegHelper;
-import net.mehvahdjukaar.moonlight.api.trades.ModItemListing;
 import net.mehvahdjukaar.moonlight.api.util.PotionBottleType;
 import net.mehvahdjukaar.moonlight.core.Moonlight;
 import net.mehvahdjukaar.moonlight.core.criteria_triggers.GrindItemTrigger;
@@ -13,7 +12,6 @@ import net.mehvahdjukaar.moonlight.core.loot.*;
 import net.mehvahdjukaar.moonlight.core.worldgen.*;
 import net.minecraft.core.Registry;
 import net.minecraft.core.component.DataComponentType;
-import net.minecraft.world.entity.schedule.Schedule;
 import net.minecraft.world.item.GameMasterBlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Rarity;
@@ -22,8 +20,6 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.levelgen.placement.PlacementModifierType;
 import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceType;
 import net.minecraft.world.level.levelgen.structure.pools.StructurePoolElementType;
-import net.minecraft.world.level.storage.loot.entries.LootPoolEntryType;
-import net.minecraft.world.level.storage.loot.predicates.LootItemConditionType;
 import org.jetbrains.annotations.ApiStatus;
 
 import java.util.function.Supplier;
@@ -36,14 +32,8 @@ public class MoonlightRegistry {
     public static void init() {
     }
 
-    public static final Registry<MapCodec<? extends ModItemListing>> VILLAGER_TRADES_REGISTRY =
-            RegHelper.registerRegistry(res("villager_trades"), false);
-
     public static final Registry<WorldSavedDataType<?>> WORLD_SAVED_DATA_TYPE_REGISTRY =
             RegHelper.registerRegistry(res("world_saved_data_type"), true);
-
-    public static final Supplier<PlacementModifierType<CaveFilter>> CAVE_MODIFIER = RegHelper.registerPlacementModifier(
-            res("below_heightmaps"), CaveFilter.CODEC);
 
     public static final Supplier<PlacementModifierType<HeightRangeFilter>> HEIGHT_RANGE = RegHelper.registerPlacementModifier(
             res("height_range_filter"), HeightRangeFilter.CODEC);
@@ -52,26 +42,22 @@ public class MoonlightRegistry {
             res("placeable_item"), () -> new BlockPlacerItem(
                     Blocks.VOID_AIR, new Item.Properties()));
 
-    public static final Supplier<LootPoolEntryType> LAZY_ITEM = RegHelper.registerLootPoolEntry(
+    public static final Supplier<MapCodec<OptionalItemPoolEntry>> LAZY_ITEM = RegHelper.registerLootPoolEntry(
             res("optional_item"), () -> OptionalItemPoolEntry.CODEC);
 
-    public static final Supplier<LootPoolEntryType> CONFIG_ITEM = RegHelper.registerLootPoolEntry(
+    public static final Supplier<MapCodec<ConfigItemPoolEntry>> CONFIG_ITEM = RegHelper.registerLootPoolEntry(
             res("config_item"), () -> ConfigItemPoolEntry.CODEC);
 
-    public static final Supplier<LootItemConditionType> LAZY_PROPERTY = RegHelper.registerLootCondition(
+    public static final Supplier<MapCodec<OptionalPropertyCondition>> LAZY_PROPERTY = RegHelper.registerLootCondition(
             res("optional_block_state_property"), () -> OptionalPropertyCondition.CODEC);
 
     public static final Supplier<GrindItemTrigger> GRIND_TRIGGER = RegHelper.registerTriggerType(
             res("grind_item"), GrindItemTrigger::new);
 
-    @Deprecated(forRemoval = true)
-    public static final Supplier<LootItemConditionType> ICONDITION_LOOT_CONDITION = RegHelper.registerLootCondition(
-            Moonlight.res("iconditions"), () -> ResourceLootItemCondition.CODEC);
-
-    public static final Supplier<LootItemConditionType> RESOURCE_CONDITION_LOOT_ITEM_CONDITION = RegHelper.registerLootCondition(
+    public static final Supplier<MapCodec<ResourceLootItemCondition>> RESOURCE_CONDITION_LOOT_ITEM_CONDITION = RegHelper.registerLootCondition(
             Moonlight.res("load_conditions"), () -> ResourceLootItemCondition.CODEC);
 
-    public static final Supplier<LootItemConditionType> PATTERN_MATCH_CONDITION = RegHelper.registerLootCondition(
+    public static final Supplier<MapCodec<PatternMatchLootItemCondition>> PATTERN_MATCH_CONDITION = RegHelper.registerLootCondition(
             Moonlight.res("loot_table_id_pattern"), () -> PatternMatchLootItemCondition.CODEC);
 
 
@@ -106,8 +92,6 @@ public class MoonlightRegistry {
                     .build()
     );
 
-    //schedule to which all the tasks are registered to
-    public static final Supplier<Schedule> CUSTOM_VILLAGER_SCHEDULE =
-            RegHelper.registerSchedule(Moonlight.res("custom_villager_schedule"), Schedule::new);
+    //26.1: schedules became datapack Timelines; the custom villager schedule hack is redesigned with the brain events (phase 8)
 
 }

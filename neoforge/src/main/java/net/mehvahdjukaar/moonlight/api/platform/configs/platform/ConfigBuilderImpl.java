@@ -17,9 +17,9 @@ import net.mehvahdjukaar.moonlight.api.util.math.ColorUtils;
 import net.mehvahdjukaar.moonlight.core.CompatHandler;
 import net.mehvahdjukaar.moonlight.core.databuddy.ConfigHelper;
 import net.mehvahdjukaar.moonlight.platform.ConfigHacks;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.neoforged.neoforge.common.ModConfigSpec;
-import org.apache.http.annotation.Experimental;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayDeque;
@@ -35,14 +35,14 @@ public class ConfigBuilderImpl extends ConfigBuilder {
 
     private final List<TrackedConfigValue<?>> trackedValues = new ArrayList<>();
 
-    public static ConfigBuilder create(ResourceLocation name, ConfigType type) {
+    public static ConfigBuilder create(Identifier name, ConfigType type) {
         return new ConfigBuilderImpl(name, type);
     }
 
     private final ModConfigSpec.Builder builder;
     private final Deque<String> cat = new ArrayDeque<>();
 
-    public ConfigBuilderImpl(ResourceLocation name, ConfigType type) {
+    public ConfigBuilderImpl(Identifier name, ConfigType type) {
         super(name, type);
         this.builder = new ModConfigSpec.Builder();
         ConfigHacks.init();
@@ -68,12 +68,8 @@ public class ConfigBuilderImpl extends ConfigBuilder {
         return new ConfigOption.UnsupportedValue(uiTitle(name), uiDescription(name), (Supplier<Object>) handle);
     }
 
-    /**
-     * Snapshot of the builder's pending change-effect flags (reload + dynamic packs), injected into each leaf as it
-     * is defined instead of being stamped through a setter afterwards. The flags stay set across a compound value's
-     * suppressed inner defines, so every leaf of a range/vec3 gets the same meta; they are cleared at the compound
-     * boundary in {@code recordOption}.
-     */
+    // Snapshot of the builder's pending change-effect flags, taken as each leaf is defined. The flags stay set across
+    // a compound value's suppressed inner defines, so every leaf of a range/vec3 gets the same meta
     private ConfigMetadata pendingMeta() {
         return new ConfigMetadata(this.pendingReload, this.pendingDynamicPacks);
     }
@@ -183,7 +179,7 @@ public class ConfigBuilderImpl extends ConfigBuilder {
         return w;
     }
 
-    @Experimental
+    @ApiStatus.Experimental
     @Override
     public Supplier<Float> define(String name, float defaultValue, float min, float max) {
         return defineFloat(name, defaultValue, min, max, false);
@@ -367,14 +363,10 @@ public class ConfigBuilderImpl extends ConfigBuilder {
         super.addTranslationsAndComments(name);
     }
 
-    /**
-     * Forge attaches a .toml comment to the NEXT defined value, so hand it the pending before-comment right
-     * before that define runs (once per comment — {@link #pollCommentToForward()} guards against re-emitting it
-     * for the suppressed backing values of a compound define). After-comments never reach a define this way, so
-     * they don't make it into the .toml file; they still reach the lang file and the screen row. Must run before
-     * every {@code builder.define(...)}, which is why every define path goes through
-     * {@link #addTranslationsAndComments}.
-     */
+    // Forge attaches a .toml comment to the NEXT defined value, so hand it the pending before-comment right before
+    // that define runs, once per comment. After-comments never reach a define this way so they miss the .toml file,
+    // but they still reach the lang file and the screen row. Must run before every builder.define(...), which is why
+    // every define path goes through addTranslationsAndComments
     private void forwardPendingComment() {
         String toForward = pollCommentToForward();
         if (toForward != null) builder.comment(toForward);

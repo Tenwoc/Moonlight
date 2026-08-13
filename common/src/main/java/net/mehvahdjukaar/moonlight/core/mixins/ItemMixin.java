@@ -1,6 +1,7 @@
 package net.mehvahdjukaar.moonlight.core.mixins;
 
 import net.mehvahdjukaar.candlelight.api.ClientOnly;
+import net.mehvahdjukaar.moonlight.api.item.ClientAnimationExtension;
 import net.mehvahdjukaar.moonlight.api.item.additional_placements.AdditionalItemPlacement;
 import net.mehvahdjukaar.moonlight.api.platform.PlatHelper;
 import net.mehvahdjukaar.moonlight.core.misc.IExtendedItem;
@@ -25,7 +26,7 @@ public abstract class ItemMixin implements IExtendedItem {
     @ClientOnly
     @Nullable
     @Unique
-    Object moonlight$clientAnimationProvider;
+    ClientAnimationExtension moonlight$clientAnimationProvider;
 
     //delegates stuff to internal blockItem
     @Inject(method = "useOn", at = @At("HEAD"), cancellable = true)
@@ -48,11 +49,12 @@ public abstract class ItemMixin implements IExtendedItem {
     }
 
     @Override
-    public @Nullable Object moonlight$getClientAnimationExtension() {
+    public @Nullable ClientAnimationExtension moonlight$getClientAnimationExtension() {
         return moonlight$clientAnimationProvider;
     }
 
-    public void moonlight$setClientAnimationExtension(Object obj) {
+    @Override
+    public void moonlight$setClientAnimationExtension(ClientAnimationExtension obj) {
         this.moonlight$clientAnimationProvider = obj;
     }
 }

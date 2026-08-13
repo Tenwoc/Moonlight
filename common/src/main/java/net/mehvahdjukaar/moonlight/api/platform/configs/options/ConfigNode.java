@@ -1,17 +1,14 @@
 package net.mehvahdjukaar.moonlight.api.platform.configs.options;
 
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Loader independent description of a single row in a config screen.
- * Both Fabric and NeoForge config holders translate their internal config representation into a tree
- * of these so that the actual screen ({@code MoonlightConfigScreen}) can stay completely platform agnostic.
- * <p>
- * An entry is either a {@link ConfigCategory} (navigable, opens a sub screen) or a
- * {@link ConfigOption} (an editable leaf value).
+ * Loader independent description of a single row in a config screen. Both config holders translate their internal
+ * representation into a tree of these, so the screen stays platform agnostic. A node is either a
+ * ConfigCategory (navigable, opens a sub screen) or a ConfigOption (an editable leaf value).
  */
 public abstract class ConfigNode {
 
@@ -21,7 +18,7 @@ public abstract class ConfigNode {
     @Nullable
     private ConfigCategory parent;
     @Nullable
-    private ResourceLocation icon;
+    private Identifier icon;
 
     protected ConfigNode(Component title, @Nullable Component description) {
         this.title = title;
@@ -44,12 +41,12 @@ public abstract class ConfigNode {
     }
 
     @ApiStatus.Internal
-    public void setIcon(@Nullable ResourceLocation icon) {
+    public void setIcon(@Nullable Identifier icon) {
         this.icon = icon;
     }
 
     @Nullable
-    public ResourceLocation icon() {
+    public Identifier icon() {
         return icon;
     }
 

@@ -1,7 +1,7 @@
 import net.mehvahdjukaar.moonlight.api.platform.RegHelper;
 import net.mehvahdjukaar.moonlight.core.Moonlight;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.item.CreativeModeTabs;
@@ -45,8 +45,8 @@ public class RegHelperExample {
 
     // Adds diamond loot to stone block
     private static void registerLootInjects(RegHelper.LootInjectEvent event) {
-        if (event.getTable().equals(ResourceLocation.parse("stone"))) {
-            event.addTableReference(ResourceLocation.parse("diamond"));
+        if (event.getTable().equals(Identifier.parse("stone"))) {
+            event.addTableReference(Identifier.parse("diamond"));
         }
     }
 

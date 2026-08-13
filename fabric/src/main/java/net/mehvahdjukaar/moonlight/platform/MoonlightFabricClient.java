@@ -4,12 +4,9 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.mehvahdjukaar.moonlight.api.client.texture_renderer.DynamicTextureRenderer;
-import net.mehvahdjukaar.moonlight.api.client.texture_renderer.RenderedTexturesManager;
+import net.mehvahdjukaar.moonlight.api.misc.SidedInstance;
 import net.mehvahdjukaar.moonlight.api.misc.fake_level.FakeLevelManager;
 import net.mehvahdjukaar.moonlight.core.MoonlightClient;
-import net.mehvahdjukaar.moonlight.core.client.MLRenderTypes;
-import net.mehvahdjukaar.moonlight.core.mixins.platform.ParticleEngineAccessor;
-import net.minecraft.client.particle.ParticleRenderType;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,18 +22,15 @@ public class MoonlightFabricClient implements ClientModInitializer {
         ItemTooltipCallback.EVENT.register(MoonlightClient::onItemTooltip);
         ClientPlayConnectionEvents.DISCONNECT.register((clientPacketListener, minecraft) -> {
             FakeLevelManager.invalidateAll();
-            RenderedTexturesManager.clearCache();
             DynamicTextureRenderer.clearCache();
+            var level = clientPacketListener.getLevel();
+            if (level != null) SidedInstance.clearAll(level.registryAccess());
         });
         PRE_CLIENT_SETUP_WORK.forEach(Runnable::run);
         CLIENT_SETUP_WORK.forEach(Runnable::run);
 
         PRE_CLIENT_SETUP_WORK.clear();
         CLIENT_SETUP_WORK.clear();
-
-        List<ParticleRenderType> renderOrder = new ArrayList<>(ParticleEngineAccessor.getRENDER_ORDER());
-        renderOrder.add(MLRenderTypes.PARTICLE_ADDITIVE_TRANSLUCENCY_RENDER_TYPE);
-        ParticleEngineAccessor.setRENDER_ORDER(renderOrder);
 
         hasRunClientEntryPoint = true;
     }

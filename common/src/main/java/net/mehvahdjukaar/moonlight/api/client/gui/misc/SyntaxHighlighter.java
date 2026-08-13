@@ -8,28 +8,21 @@ import net.minecraft.util.FormattedCharSequence;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.BiFunction;
 
 /**
- * A per-line syntax colorer. The one thing an implementation must do is classify each character of a line into an
- * RGB color ({@link #colors}); everything else is derived from that:
- * <ul>
- *     <li>{@link #highlightLine} renders a line as a colored {@link FormattedCharSequence} — used by
- *         {@link SyntaxEditBox} (multi-line).</li>
- *     <li>{@link #formatter} adapts it to {@link EditBox#setFormatter} — used to colorize a single-line box.</li>
- * </ul>
- * Built-in implementations are singletons: {@link JsonHighlighter#INSTANCE}, {@link NbtHighlighter#INSTANCE},
- * {@link RegexHighlighter#INSTANCE}. Being a functional interface, an ad-hoc {@code line -> int[]} lambda works too.
+ * A per-line syntax colorer. An implementation only has to classify each character of a line into an RGB color;
+ * highlightLine (multi-line, for SyntaxEditBox) and formatter (single-line, for
+ * EditBox.addFormatter) are derived from that. Built-in implementations are singletons, and being a
+ * functional interface an ad-hoc line -> int[] lambda works too.
  */
 @FunctionalInterface
 public interface SyntaxHighlighter {
 
     int FALLBACK_COLOR = ConfigGuiColors.SYNTAX_DEFAULT;
 
-    /** @return one RGB color per character of {@code line} (array length == {@code line.length()}). */
+    /** @return one RGB color per character of the line. */
     int[] colors(String line);
 
-    /** Renders one line as a colored sequence, coalescing runs of equal color. */
     default FormattedCharSequence highlightLine(String line) {
         if (line.isEmpty()) return FormattedCharSequence.EMPTY;
         int[] colors = colors(line);
@@ -46,17 +39,16 @@ public interface SyntaxHighlighter {
     }
 
     /**
-     * A formatter for {@link EditBox#setFormatter} bound to {@code box}: it colors the box's whole value with this
-     * highlighter and hands back the requested chunk. The color scan is cached per source string so it isn't
-     * recomputed for every rendered chunk.
+     * A formatter for EditBox.addFormatter bound to box: colors the box's whole value and hands back
+     * the requested chunk. The scan is cached per source string so it isn't redone for every rendered chunk.
      */
-    default BiFunction<String, Integer, FormattedCharSequence> formatter(EditBox box) {
-        return new BiFunction<>() {
+    default EditBox.TextFormatter formatter(EditBox box) {
+        return new EditBox.TextFormatter() {
             private String cachedSource;
             private int[] cachedColors;
 
             @Override
-            public FormattedCharSequence apply(String chunk, Integer displayPos) {
+            public FormattedCharSequence format(String chunk, int displayPos) {
                 String source = box.getValue();
                 if (!source.equals(cachedSource)) {
                     cachedSource = source;

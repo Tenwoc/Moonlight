@@ -8,7 +8,7 @@ import net.mehvahdjukaar.moonlight.api.platform.configs.ModConfigHolder;
 import net.mehvahdjukaar.moonlight.api.platform.configs.ConfigType;
 import net.mehvahdjukaar.moonlight.core.Moonlight;
 import net.minecraft.core.Direction;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 import java.util.List;
 import java.util.function.Supplier;
@@ -28,7 +28,7 @@ public class ConfigBuilderHelper {
     ).apply(inst, MyObj::new));
 
     // Same object, but declared with a CodecUI schema (via the codecui jar Moonlight bundles). A SchemaCodec IS a
-    // Codec, so the wire format is identical to CODEC above — but because it carries an edit surface, defineObject
+    // Codec, so the wire format is identical to CODEC above - but because it carries an edit surface, defineObject
     // builds a real in-game form for it (here: two 0..100 int sliders) instead of a raw-JSON editor.
     public static final SchemaCodec<MyObj> SCHEMA_CODEC = SchemaRecord.create(MyObj.class, i -> i.group(
             i.field("first", SchemaCodecs.intRange(0, 100), MyObj::first),
@@ -38,7 +38,7 @@ public class ConfigBuilderHelper {
 
     public static final Supplier<Boolean> BOOL_CONFIG;
     public static final Supplier<Integer> COLOR_CONFIG;
-    public static final Supplier<ResourceLocation> RESOURCE_CONFIG;
+    public static final Supplier<Identifier> RESOURCE_CONFIG;
     public static final Supplier<Direction> ENUM_CONFIG;
     public static final Supplier<List<String>> LIST_CONFIG;
     public static final Supplier<MyObj> OBJECT_CONFIG;
@@ -53,7 +53,7 @@ public class ConfigBuilderHelper {
         builder.push("misc");
         BOOL_CONFIG = builder.comment("This is a boolean config").define("bool_config", true);
         COLOR_CONFIG = builder.comment("Hex color config").defineColor("color", 0xff0000);
-        RESOURCE_CONFIG = builder.comment("Resource location config").define("res", ResourceLocation.parse("hello"));
+        RESOURCE_CONFIG = builder.comment("Resource location config").define("res", Identifier.parse("hello"));
         ENUM_CONFIG = builder.comment("Enum config").define("direction", Direction.UP);
         LIST_CONFIG = builder.comment("This is a list").define("list_config", List.of("dog"));
         OBJECT_CONFIG = builder.comment("Custom object with a plain codec - edited as raw JSON on the config screen")

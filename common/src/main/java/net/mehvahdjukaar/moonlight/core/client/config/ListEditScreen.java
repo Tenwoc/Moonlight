@@ -1,6 +1,5 @@
 package net.mehvahdjukaar.moonlight.core.client.config;
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import net.mehvahdjukaar.moonlight.api.client.gui.GuiHelper;
 import net.mehvahdjukaar.moonlight.api.client.gui.screen.ColorPickerScreen;
 import net.mehvahdjukaar.moonlight.api.client.gui.misc.ConfigGuiColors;
@@ -11,7 +10,7 @@ import net.mehvahdjukaar.moonlight.api.client.gui.PopupHost;
 import net.mehvahdjukaar.moonlight.api.platform.configs.options.ConfigOption;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.ContainerObjectSelectionList;
@@ -19,9 +18,13 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.CharacterEvent;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -69,7 +72,7 @@ class ListEditScreen extends Screen implements PopupHost {
         this.addRenderableWidget(Button.builder(addLabel, b -> {
             working.add(options != null && !options.isEmpty() ? options.getFirst() : "");
             rebuildRows();
-            this.list.setScrollAmount(this.list.getMaxScroll());
+            this.list.setScrollAmount(this.list.maxScrollAmount());
         }).bounds(cx - 100, this.height - 52, 200, 20).build());
 
         this.addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> {
@@ -95,9 +98,10 @@ class ListEditScreen extends Screen implements PopupHost {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (overlay.mouseClicked(mouseX, mouseY, button)) return true;
-        return super.mouseClicked(mouseX, mouseY, button);
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x(), mouseY = event.y();
+        if (overlay.mouseClicked(event, doubleClick)) return true;
+        return super.mouseClicked(event, doubleClick);
     }
 
     @Override
@@ -107,27 +111,27 @@ class ListEditScreen extends Screen implements PopupHost {
     }
 
     @Override
-    public boolean keyPressed(int key, int scanCode, int modifiers) {
-        if (overlay.keyPressed(key, scanCode, modifiers)) return true;
-        return super.keyPressed(key, scanCode, modifiers);
+    public boolean keyPressed(KeyEvent event) {
+        if (overlay.keyPressed(event)) return true;
+        return super.keyPressed(event);
     }
 
     @Override
-    public boolean charTyped(char c, int modifiers) {
-        if (overlay.charTyped(c, modifiers)) return true;
-        return super.charTyped(c, modifiers);
+    public boolean charTyped(CharacterEvent event) {
+        if (overlay.charTyped(event)) return true;
+        return super.charTyped(event);
     }
 
     @Override
-    public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.renderBackground(graphics, mouseX, mouseY, partialTick);
+    public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+        super.extractBackground(graphics, mouseX, mouseY, partialTick);
         // header chrome in the background layer, behind the widgets (the list draws only its footer separator)
         GuiHelper.renderHeaderBar(graphics, this.font, this.title, this.width, HEADER);
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
         this.overlay.render(graphics, mouseX, mouseY); // open dropdown popup floats on top
     }
 
@@ -139,7 +143,7 @@ class ListEditScreen extends Screen implements PopupHost {
         void replaceEntries(List<EntryRow> rows) {
             this.clearEntries();
             rows.forEach(this::addEntry);
-            this.clampScrollAmount();
+            this.refreshScrollAmount();
         }
 
         @Override
@@ -148,17 +152,15 @@ class ListEditScreen extends Screen implements PopupHost {
         }
 
         @Override
-        protected int getScrollbarPosition() {
+        protected int scrollBarX() {
             return this.width / 2 + ROW_WIDTH / 2 + 6;
         }
 
         @Override
-        protected void renderListSeparators(GuiGraphics graphics) {
-            // the top separator is owned by the screen's header bar (drawn in renderBackground); only draw the footer
-            ResourceLocation footer = this.minecraft.level == null ? Screen.FOOTER_SEPARATOR : Screen.INWORLD_FOOTER_SEPARATOR;
-            RenderSystem.enableBlend();
-            graphics.blit(footer, this.getX(), this.getBottom(), 0f, 0f, this.getWidth(), 2, 32, 2);
-            RenderSystem.disableBlend();
+        protected void extractListSeparators(GuiGraphicsExtractor graphics) {
+            // the top separator is owned by the screen's header bar (drawn in extractBackground); only draw the footer
+            Identifier footer = this.minecraft.level == null ? Screen.FOOTER_SEPARATOR : Screen.INWORLD_FOOTER_SEPARATOR;
+            graphics.blit(RenderPipelines.GUI_TEXTURED, footer, this.getX(), this.getBottom(), 0f, 0f, this.getWidth(), 2, 32, 2);
         }
     }
 
@@ -198,15 +200,15 @@ class ListEditScreen extends Screen implements PopupHost {
         }
 
         @Override
-        public void render(GuiGraphics graphics, int i, int top, int left, int width, int height,
-                           int mouseX, int mouseY, boolean hovering, float partialTick) {
+        public void extractContent(GuiGraphicsExtractor graphics, int mouseX, int mouseY, boolean hovering, float partialTick) {
+            int top = this.getY(), left = this.getX(), width = this.getWidth(), height = this.getHeight();
             int cy = top + (height - CONTROL_HEIGHT) / 2;
             editor.setX(left);
             editor.setY(cy);
-            editor.render(graphics, mouseX, mouseY, partialTick);
+            editor.extractRenderState(graphics, mouseX, mouseY, partialTick);
             remove.setX(left + width - RESET_WIDTH);
             remove.setY(cy);
-            remove.render(graphics, mouseX, mouseY, partialTick);
+            remove.extractRenderState(graphics, mouseX, mouseY, partialTick);
         }
 
         @Override

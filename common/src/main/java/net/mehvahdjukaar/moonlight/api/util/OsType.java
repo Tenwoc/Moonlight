@@ -3,7 +3,7 @@ package net.mehvahdjukaar.moonlight.api.util;
 import java.util.Locale;
 
 /**
- * Simple operating system family detection based on the {@code os.name} system property.
+ * Simple operating system family detection based on the os.name system property.
  */
 public enum OsType {
     WINDOWS("windows"),
@@ -23,7 +23,7 @@ public enum OsType {
     }
 
     /**
-     * Lowercase identifier for this OS ({@code windows}, {@code macos}, {@code linux}).
+     * Lowercase identifier for this OS (windows, macos, linux).
      * Handy as a key into per-OS config maps or download source tables.
      */
     public String key() {
@@ -50,7 +50,7 @@ public enum OsType {
     }
 
     /**
-     * Resolves a native executable file name for this OS, appending {@code .exe} on Windows.
+     * Resolves a native executable file name for this OS, appending .exe on Windows.
      */
     public String executableName(String baseName) {
         return this == WINDOWS ? baseName + ".exe" : baseName;

@@ -22,7 +22,6 @@ public abstract class ConfigValue<T> extends ConfigEntry implements IConfigValue
     private final ConfigMetadata meta;
     private String translationKey = "";
     private String commentKey = "";
-    private String rawComment = "";
     private boolean slider = false;
     private boolean percent = false;
 
@@ -44,7 +43,7 @@ public abstract class ConfigValue<T> extends ConfigEntry implements IConfigValue
     /** Reads this value out of its json element. May throw or return null to fall back to the default. */
     protected abstract T parseValue(JsonElement element) throws Exception;
 
-    /** Serializes this value into the json element written under {@link #getName()}. */
+    /** Serializes this value into the json element written under getName. */
     protected abstract JsonElement encodeValue(T value);
 
     @Override
@@ -80,7 +79,7 @@ public abstract class ConfigValue<T> extends ConfigEntry implements IConfigValue
         return changed;
     }
 
-    /** Void convenience setter (used as a {@code Consumer} by the legacy Cloth/YACL screens). */
+    /** Void convenience setter (used as a Consumer by the legacy Cloth/YACL screens). */
     public void set(T newValue) {
         setValue(newValue);
     }
@@ -114,18 +113,6 @@ public abstract class ConfigValue<T> extends ConfigEntry implements IConfigValue
     public Component getCommentComponent() {
         if (this.commentKey.isEmpty()) return null;
         return Component.translatable(commentKey);
-    }
-
-    public String getRawComment() {
-        return rawComment;
-    }
-
-    public void setRawComment(String rawDescription) {
-        this.rawComment = rawDescription;
-    }
-
-    public String getExtraInfo() {
-        return "";
     }
 
     public boolean isSlider() {

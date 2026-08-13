@@ -1,6 +1,5 @@
 package net.mehvahdjukaar.moonlight.api.client;
 
-import net.mehvahdjukaar.candlelight.api.ClientOnly;
 import net.mehvahdjukaar.moonlight.api.misc.TileOrEntityTarget;
 import net.mehvahdjukaar.moonlight.api.platform.network.NetworkHelper;
 import net.mehvahdjukaar.moonlight.core.network.ClientBoundOpenScreenMessage;
@@ -17,20 +16,13 @@ import org.jetbrains.annotations.Nullable;
  */
 public interface IScreenProvider {
 
-    @Deprecated(forRemoval = true)
-    @ClientOnly
-    default void openScreen(Level level, Player player, Direction direction) {
-    }
-
-    @ClientOnly
-    default void openScreen(Level level, Player player, Direction direction, Vec3 hitPos) {
-        openScreen(level, player, direction);
-    }
-
-    @Deprecated(forRemoval = true)
-    default void sendOpenGuiPacket(ServerPlayer player, @Nullable Direction hitFace) {
-        sendOpenGuiPacket(player, hitFace, null);
-    }
+    /**
+     * Only ever called client side, by the packet sendOpenGuiPacket sends. Deliberately takes no client
+     * type so that a block entity implementing this stays loadable on a dedicated server. Implementations must
+     * hand off to a client only class instead of building the screen inline, so that server side class loading
+     * never has to resolve one.
+     */
+    void openScreen(Level level, Player player, Direction direction, Vec3 hitPos);
 
     default void sendOpenGuiPacket(ServerPlayer player, @Nullable Direction hitFace, @Nullable Vec3 hitPos) {
         TileOrEntityTarget target;

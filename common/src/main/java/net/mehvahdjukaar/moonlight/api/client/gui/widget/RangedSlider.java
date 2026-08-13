@@ -7,9 +7,9 @@ import net.minecraft.util.Mth;
 import java.util.function.Consumer;
 
 /**
- * A slider bound to a numeric value within {@code [min, max]}. Vanilla's {@link AbstractSliderButton} stores its
- * position as a 0..1 fraction; this maps to/from the real value range and reports edits through {@code onValue}.
- * {@code integer} snaps to whole numbers; {@code percent} shows the value as {@code NN%} (use {@code min=0, max=1}).
+ * A slider bound to a numeric value within [min, max]. Vanilla's AbstractSliderButton stores its
+ * position as a 0..1 fraction; this maps to/from the real value range and reports edits through onValue.
+ * integer snaps to whole numbers; percent shows the value as NN% (use min=0, max=1).
  */
 public class RangedSlider extends AbstractSliderButton {
 
@@ -40,7 +40,7 @@ public class RangedSlider extends AbstractSliderButton {
     }
 
     /**
-     * Repositions the slider to show the given value without firing {@link #applyValue()} extra times beyond the
+     * Repositions the slider to show the given value without firing applyValue extra times beyond the
      * normal message update.
      */
     public void setActualValue(double value) {

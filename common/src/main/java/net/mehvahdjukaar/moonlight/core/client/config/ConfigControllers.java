@@ -9,9 +9,9 @@ import net.mehvahdjukaar.moonlight.api.client.gui.widget.*;
 import net.mehvahdjukaar.moonlight.api.platform.configs.options.ConfigOption;
 import net.mehvahdjukaar.moonlight.api.util.math.Range;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.core.Vec3i;
@@ -28,12 +28,9 @@ import java.util.function.Function;
 import static net.mehvahdjukaar.moonlight.core.client.config.ConfigScreenLayout.*;
 import static net.mehvahdjukaar.moonlight.api.client.gui.misc.ConfigGuiColors.*;
 
-/**
- * Client side registry that turns a server safe {@link ConfigOption} into an editing {@link ConfigVisuals}. This
- * is the one place that knows about widgets: the screen just asks {@link #create} and never branches on value
- * type itself, so adding a new control means registering one provider here (or, for add-ons,
- * {@link #register} from their own client init) rather than touching the screen.
- */
+// Client side registry turning a server safe ConfigOption into an editing ConfigVisuals. The one place that knows
+// about widgets: the screen just asks create() and never branches on value type, so a new control means registering a
+// provider here (or, for add-ons, register() from their own client init) rather than touching the screen.
 public final class ConfigControllers {
 
     private static final Map<Class<?>, ConfigVisuals. Provider<?>> PROVIDERS = new HashMap<>();
@@ -50,10 +47,8 @@ public final class ConfigControllers {
     }
 
 
-    // ===== built-in providers =====
     static {
-        // normal booleans use a plain ON/OFF text button; the yes/no (✓/✗) sprite toggle is reserved for category
-        // feature() switches (see CategoryRow and ConfigControls#featureToggle)
+        // the check/cross sprite toggle is reserved for feature() switches, plain booleans get an ON/OFF text button
         register(ConfigOption.BooleanValue.class, (o, s, onChange) -> {
             CycleButton<Boolean> w = CycleButton.onOffBuilder(s.current(o))
                     .displayOnlyValue()
@@ -83,7 +78,7 @@ public final class ConfigControllers {
                 onChange.run();
             });
             EditBox box = (EditBox) control.widget();
-            box.setFormatter(RegexHighlighter.INSTANCE.formatter(box)); // live regex syntax coloring
+            box.addFormatter(RegexHighlighter.INSTANCE.formatter(box)); // live regex syntax coloring
             return control;
         });
 
@@ -102,8 +97,7 @@ public final class ConfigControllers {
             return new ConfigVisuals<Integer>(w, w::setColor);
         });
 
-        // plain numbers -> stepper field; slider subtypes -> slider. The value's own class is the
-        // "draw me as X" signal, so there is no style flag to branch on.
+        // plain numbers -> stepper field, slider subtypes -> slider. The value's own class is the signal
         register(ConfigOption.IntValue.class, (o, s, onChange) ->
                 numberField(s.current(o), o.min, o.max, true, v -> {
                     s.put(o, (int) Math.round(v));
@@ -204,14 +198,11 @@ public final class ConfigControllers {
     }
 
 
-    /**
-     * The control for a category's {@code feature()} gate when shown as a row inside its own category: a full-width
-     * button styled like the plain boolean control but drawing the yes/no (✓/✗) sprites instead of ON/OFF text,
-     * matching the small inline toggle the parent screen shows next to the category button.
-     */
+    // A category's feature() gate shown as a row inside its own category: like the plain boolean control but drawing
+    // check/cross sprites, matching the inline toggle the parent screen shows next to the category button
     static ConfigVisuals<Boolean> featureToggle(ConfigOption.BooleanValue o, ConfigEditSession s, Runnable onChange) {
-        ResourceLocation icon = o.icon();
-        // draw the feature's decorative item just left of the ✓/✗ symbol, when it resolves to something
+        Identifier icon = o.icon();
+        // draw the feature's decorative item just left of the check/cross symbol, when it resolves to something
         BooleanToggleWidget.ExtraIcon iconRenderer = icon == null ? null : new BooleanToggleWidget.ExtraIcon() {
             private final ConfigScreenIcons.Anim anim = new ConfigScreenIcons.Anim();
 
@@ -221,7 +212,7 @@ public final class ConfigControllers {
             }
 
             @Override
-            public void render(GuiGraphics graphics, int x, int y, int size, boolean hovered, boolean lit) {
+            public void render(GuiGraphicsExtractor graphics, int x, int y, int size, boolean hovered, boolean lit) {
                 anim.update(hovered && lit);
                 ConfigScreenIcons.renderAnimated(graphics, icon, x, y, anim.phase(), lit);
             }
@@ -233,12 +224,10 @@ public final class ConfigControllers {
         }, iconRenderer);
         return new ConfigVisuals<Boolean>(w, w::set);
     }
-    // ===== widget builders =====
 
     private static <E extends Enum<E>> ConfigVisuals<E> enumControl(ConfigOption.EnumValue<E> o, ConfigEditSession s, Runnable onChange) {
-        CycleButton<E> w = CycleButton.<E>builder(x -> Component.literal(x.name()))
+        CycleButton<E> w = CycleButton.<E>builder(x -> Component.literal(x.name()), s.current(o))
                 .withValues(o.options)
-                .withInitialValue(s.current(o))
                 .displayOnlyValue()
                 .create(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT, Component.empty(), (btn, val) -> {
                     s.put(o, val);

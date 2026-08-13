@@ -15,6 +15,7 @@ import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.component.Consumable;
 import net.minecraft.world.item.component.SuspiciousStewEffects;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
@@ -57,6 +58,14 @@ public class FoodProvider {
     }
 
     /**
+     * The drinking/eating sound lives on the item's Consumable component since 1.21.2
+     */
+    protected static void playConsumeSound(Player player, ItemStack stack) {
+        Consumable consumable = stack.get(DataComponents.CONSUMABLE);
+        if (consumable != null) player.playSound(consumable.sound().value(), 1, 1);
+    }
+
+    /**
      * Consumes some fluid and gives the player the appropriate effect
      *
      * @return if one unit has been consumed
@@ -73,7 +82,7 @@ public class FoodProvider {
         if (this.divider == 1) {
             this.foodItem.finishUsingItem(foodStack.copy(), world, player);
             if (foodProperties != null) {
-                player.playSound(this.foodItem.getDrinkingSound(), 1, 1);
+                playConsumeSound(player, foodStack);
             }
             //player already plays sound
             return true;
@@ -81,7 +90,7 @@ public class FoodProvider {
         if (foodProperties != null && player.canEat(false)) {
 
             player.getFoodData().eat(foodProperties.nutrition() / this.divider, foodProperties.saturation() / (float) this.divider);
-            player.playSound(this.foodItem.getDrinkingSound(), 1, 1);
+            playConsumeSound(player, foodStack);
             return true;
         }
         return false;
@@ -95,7 +104,7 @@ public class FoodProvider {
 
         @Override
         public boolean consume(Player player, Level world, @Nullable Consumer<ItemStack> nbtApplier) {
-            player.giveExperiencePoints(Utils.getXPinaBottle(1, world.random));
+            player.giveExperiencePoints(Utils.getXPinaBottle(1, world.getRandom()));
             player.playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 1, 1);
             return true;
         }
@@ -113,7 +122,7 @@ public class FoodProvider {
                     break;
                 }
             }
-            player.playSound(this.foodItem.getDrinkingSound(), 1, 1);
+            playConsumeSound(player, stack);
             return true;
         }
     };
@@ -134,7 +143,7 @@ public class FoodProvider {
                 }
 
                 player.getFoodData().eat(foodProperties.nutrition() / this.divider, foodProperties.saturation() / (float) this.divider);
-                player.playSound(this.foodItem.getDrinkingSound(), 1, 1);
+                playConsumeSound(player, stack);
                 return true;
             }
             return false;

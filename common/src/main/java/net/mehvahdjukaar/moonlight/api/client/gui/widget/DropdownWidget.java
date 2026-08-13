@@ -7,10 +7,13 @@ import net.mehvahdjukaar.moonlight.api.client.gui.PopupHost;
 import net.mehvahdjukaar.moonlight.api.client.gui.misc.ConfigGuiColors;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
@@ -24,15 +27,12 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
- * A combo box / picker styled like a text field: a box holding the current value, with the right edge split off by
- * a vertical line into a small box holding a downward arrow. Clicking it expands a scrollable list of the options
- * below (or above, if there's no room), and the value area turns into a search box that filters the list. An
- * optional {@code icon} draws an item beside each option (item/block pickers).
+ * A combo box styled like a text field, its right edge split off by a vertical line into a small box holding a
+ * downward arrow. Clicking expands a scrollable list of the options below (or above, if there's no room) and turns
+ * the value area into a search box filtering it. An optional icon draws an item beside each option.
  * <p>
- * Because a widget can live inside a scissored list (which clips by rectangle, not depth, so a Z offset alone can't
- * escape it), the expanded list is a {@link Popup} drawn and click/scroll/key tested by the {@link PopupHost} screen
- * (through its {@link OverlayLayer}) so it can float above everything. Any screen that hosts a dropdown just has to
- * be a {@link PopupHost}; the widget opens itself through the host's layer on click.
+ * The expanded list is a Popup so it can float above a scissored parent (see OverlayLayer). Any
+ * screen hosting a dropdown just has to be a PopupHost; the widget opens itself through its layer on click.
  */
 public class DropdownWidget extends AbstractWidget implements Popup {
 
@@ -94,10 +94,10 @@ public class DropdownWidget extends AbstractWidget implements Popup {
         return getWidth() - getHeight(); // the right square is the arrow box
     }
 
-    // ===== closed box (rendered in the row) =====
+    // closed box, rendered in the row
 
     @Override
-    protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+    protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         int x = getX(), y = getY(), w = getWidth(), h = getHeight();
         int border = (open || isFocused()) ? 0xFFFFFFFF : 0xFFA0A0A0;
         Font font = font();
@@ -111,11 +111,11 @@ public class DropdownWidget extends AbstractWidget implements Popup {
             this.searchBox.setPosition(x + 4, y + (h - font.lineHeight) / 2 + 1);
             this.searchBox.setWidth(sepX - 2 - (x + 4));
             this.searchBox.setHeight(font.lineHeight);
-            this.searchBox.render(graphics, mouseX, mouseY, partialTick);
+            this.searchBox.extractRenderState(graphics, mouseX, mouseY, partialTick);
         } else {
             int textX = x + 4;
             if (icon != null) {
-                graphics.renderFakeItem(iconFor(value), x + 2, y + (h - 16) / 2);
+                graphics.fakeItem(iconFor(value), x + 2, y + (h - 16) / 2);
                 textX = x + 2 + 18;
             }
             // scroll the value like an option-row label when it's wider than the box
@@ -123,12 +123,12 @@ public class DropdownWidget extends AbstractWidget implements Popup {
         }
 
         graphics.fill(sepX, y, sepX + 1, y + h, border); // separator, same color as the outline
-        graphics.drawCenteredString(font, open ? "▲" : "▼", sepX + arrowBox / 2, y + (h - font.lineHeight) / 2 + 1, ConfigGuiColors.TEXT);
-        graphics.renderOutline(x, y, w, h, border);
+        graphics.centeredText(font, open ? "▲" : "▼", sepX + arrowBox / 2, y + (h - font.lineHeight) / 2 + 1, ConfigGuiColors.TEXT);
+        graphics.outline(x, y, w, h, border);
     }
 
     @Override
-    public void onClick(double mouseX, double mouseY) {
+    public void onClick(MouseButtonEvent event, boolean doubleClick) {
         if (open) {
             close();
         } else if (Minecraft.getInstance().screen instanceof PopupHost h) {
@@ -167,9 +167,8 @@ public class DropdownWidget extends AbstractWidget implements Popup {
         return Math.max(0, filtered.size() - visibleCount());
     }
 
-    /** {x, y, w, h, visible} of the open popup. Opens downward when it fits (the natural direction), else toward the
-     * side with more room; and caps the visible-row count to whatever the chosen side can hold so a dropdown opened
-     * mid-screen shrinks instead of running off the top or bottom. */
+    // {x, y, w, h, visible} of the open popup. Opens downward when it fits, else toward the side with more room, and
+    // caps the visible row count to what that side holds so a dropdown opened mid-screen shrinks instead of running off
     private int[] popupRect() {
         int w = getWidth();
         int x = getX();
@@ -189,23 +188,22 @@ public class DropdownWidget extends AbstractWidget implements Popup {
         return new int[]{x, y, w, h, visible};
     }
 
-    // ===== popup + input (driven by the host so it floats above the list) =====
+    // popup + input, driven by the host so it floats above the list
 
     @Override
-    public void renderPopup(GuiGraphics graphics, int mouseX, int mouseY) {
+    public void renderPopup(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
         if (!open) return;
         int[] r = popupRect();
         int x = r[0], y = r[1], w = r[2], h = r[3];
         Font font = font();
 
-        // float the whole popup above the list rows and their item icons (which render at z 150)
-        graphics.pose().pushPose();
-        graphics.pose().translate(0, 0, 200);
+        // a stratum of its own so the whole popup sorts above the list rows and their item icons
+        graphics.nextStratum();
 
         graphics.fill(x, y, x + w, y + h, 0xFF101010); // fully opaque so text behind never bleeds through
 
         if (filtered.isEmpty()) {
-            graphics.drawString(font, Component.translatable("gui.moonlight.config.no_matches"),
+            graphics.text(font, Component.translatable("gui.moonlight.config.no_matches"),
                     x + 4, y + (itemHeight - font.lineHeight) / 2 + 1, ConfigGuiColors.DESCRIPTION);
         }
 
@@ -221,16 +219,16 @@ public class DropdownWidget extends AbstractWidget implements Popup {
             if (hover) graphics.fill(x + 1, iy, x + w - 1, iy + itemHeight, 0x40FFFFFF);
             int textX = x + 4;
             if (icon != null) {
-                graphics.renderFakeItem(iconFor(opt), x + 2, iy + (itemHeight - 16) / 2);
+                graphics.fakeItem(iconFor(opt), x + 2, iy + (itemHeight - 16) / 2);
                 textX = x + 2 + 18;
             }
             int color = opt.equals(value) ? ConfigGuiColors.SELECTED : ConfigGuiColors.TEXT;
-            // scroll the hovered entry when it overflows; clip the rest so nothing bleeds under the scrollbar
+            // scroll the hovered entry when it overflows, and clip the rest so nothing bleeds under the scrollbar
             if (hover) {
                 GuiHelper.renderScrollingText(graphics, font, Component.literal(opt), textX, textRight, iy, itemHeight, color);
             } else {
                 graphics.enableScissor(textX, iy, textRight, iy + itemHeight);
-                graphics.drawString(font, opt, textX, iy + (itemHeight - font.lineHeight) / 2 + 1, color);
+                graphics.text(font, opt, textX, iy + (itemHeight - font.lineHeight) / 2 + 1, color);
                 graphics.disableScissor();
             }
         }
@@ -243,17 +241,17 @@ public class DropdownWidget extends AbstractWidget implements Popup {
             graphics.fill(trackX, thumbY, trackX + 2, thumbY + thumbH, 0xFFB0B0B0);
         }
 
-        graphics.renderOutline(x, y, w, h, 0xFFFFFFFF); // drawn last so the border is unbroken
-        graphics.pose().popPose();
+        graphics.outline(x, y, w, h, 0xFFFFFFFF); // drawn last so the border is unbroken
     }
 
-    /** Called by the host on any click while open. Returns true (always consumes). */
+    // called by the host on any click while open. Always consumes
     @Override
-    public boolean popupMouseClicked(double mouseX, double mouseY, int button) {
+    public boolean popupMouseClicked(MouseButtonEvent event, boolean doubleClick) {
         if (!open) return false;
-        // clicking in the value/search area just moves the caret, keep the popup open
+        double mouseX = event.x(), mouseY = event.y();
+        // clicking in the value/search area just moves the caret, so keep the popup open
         if (mouseX >= getX() && mouseX < getX() + valueAreaWidth() && mouseY >= getY() && mouseY < getY() + getHeight()) {
-            this.searchBox.mouseClicked(mouseX, mouseY, button);
+            this.searchBox.mouseClicked(event, doubleClick);
             return true;
         }
         int[] r = popupRect();
@@ -276,8 +274,9 @@ public class DropdownWidget extends AbstractWidget implements Popup {
     }
 
     @Override
-    public boolean popupKeyPressed(int key, int scan, int mods) {
+    public boolean popupKeyPressed(KeyEvent event) {
         if (!open) return false;
+        int key = event.key();
         if (key == 256) { // escape
             close();
             return true;
@@ -287,12 +286,12 @@ public class DropdownWidget extends AbstractWidget implements Popup {
             close();
             return true;
         }
-        return this.searchBox.keyPressed(key, scan, mods);
+        return this.searchBox.keyPressed(event);
     }
 
     @Override
-    public boolean popupCharTyped(char c, int mods) {
-        return open && this.searchBox.charTyped(c, mods);
+    public boolean popupCharTyped(CharacterEvent event) {
+        return open && this.searchBox.charTyped(event);
     }
 
     private void select(String v) {

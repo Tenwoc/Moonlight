@@ -4,7 +4,7 @@ import net.mehvahdjukaar.moonlight.api.platform.PlatHelper;
 import net.mehvahdjukaar.moonlight.api.util.math.colors.RGBColor;
 import net.mehvahdjukaar.moonlight.core.Moonlight;
 import net.mehvahdjukaar.moonlight.core.misc.McMetaFile;
-import net.minecraft.util.FastColor;
+import net.minecraft.util.ARGB;
 import net.minecraft.world.level.block.Rotation;
 
 public final class TextureOps {
@@ -55,7 +55,7 @@ public final class TextureOps {
                 int overlayFrame = Math.min(pixel.frameIndex(), overlay.frameCount() - 1);
                 int overlayPixel = overlay.getFramePixel(overlayFrame, frameX, frameY);
 
-                if (onlyOnExisting && FastColor.ABGR32.alpha(overlayPixel) == 0) {
+                if (onlyOnExisting && ARGB.alpha(overlayPixel) == 0) {
                     return;
                 }
 
@@ -74,19 +74,13 @@ public final class TextureOps {
     public static void makeOpaque(TextureImage img, int backgroundColor) {
         img.forEachPixel(pixel -> {
             int oldValue = pixel.getValue();
-            int alpha = FastColor.ABGR32.alpha(oldValue);
+            int alpha = ARGB.alpha(oldValue);
             if (alpha == 0) {
-                // Fully transparent — replace with background color
+                // Fully transparent - replace with background color
                 pixel.setValue(backgroundColor);
             } else {
                 // Keep color, but set alpha fully opaque (255)
-                int newColor = FastColor.ABGR32.color(
-                        255,
-                        FastColor.ABGR32.red(oldValue),
-                        FastColor.ABGR32.green(oldValue),
-                        FastColor.ABGR32.blue(oldValue)
-                );
-                pixel.setValue(newColor);
+                pixel.setValue(ARGB.opaque(oldValue));
             }
         });
     }
@@ -104,7 +98,7 @@ public final class TextureOps {
 
         img.forEachPixel(pixel -> {
             int maskPixel = mask.getPixel(pixel.x(), pixel.y());
-            boolean maskOpaque = FastColor.ABGR32.alpha(maskPixel) != 0;
+            boolean maskOpaque = ARGB.alpha(maskPixel) != 0;
             if (maskOpaque == discardOpaque) {
                 pixel.setValue(0);
             }
@@ -146,7 +140,7 @@ public final class TextureOps {
     //create
 
     /**
-     * Creates a new image made of {@code length} copies of this one's first frame, stacked vertically.
+     * Creates a new image made of length copies of this one's first frame, stacked vertically.
      * Its frame data will be the one provided
      */
     public static TextureImage createSingleFrameAnimation(TextureImage img, int length, McMetaFile animationData) {
@@ -165,11 +159,6 @@ public final class TextureOps {
             pixel.setValue(img.getFramePixel(0, xo, yo));
         });
         return newImage;
-    }
-
-    @Deprecated(forRemoval = true)
-    public static TextureImage createSingleFrameAnimation(TextureImage img, McMetaFile animationData) {
-        return createSingleFrameAnimation(img, img.frameCount(), animationData);
     }
 
     public static TextureImage createScaled(TextureImage img, float widthScale, float heightScale) {

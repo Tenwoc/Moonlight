@@ -107,7 +107,7 @@ public final class FileDownloadUtils {
                     Thread.currentThread().interrupt();
                     throw new IOException("Download interrupted", ie);
                 }
-                // Re‑read the size of the partial file for the next attempt
+                // Re-read the size of the partial file for the next attempt
                 downloadedBytes = Files.exists(tmp) ? Files.size(tmp) : 0;
             }
         }
@@ -120,7 +120,7 @@ public final class FileDownloadUtils {
     }
 
     /**
-     * Fetches a URL fully into memory as raw bytes. For large payloads prefer {@link #download} to a file.
+     * Fetches a URL fully into memory as raw bytes. For large payloads prefer download to a file.
      */
     public static byte[] readBytes(String urlStr) throws IOException {
         validateUrl(urlStr);
@@ -164,7 +164,7 @@ public final class FileDownloadUtils {
                     StandardCopyOption.REPLACE_EXISTING,
                     StandardCopyOption.ATOMIC_MOVE);
         } catch (UnsupportedOperationException | IOException e) {
-            // Fallback: non‑atomic move (copy + delete) – still safer than leaving a .part file
+            // Fallback: non-atomic move (copy + delete) - still safer than leaving a .part file
             Moonlight.LOGGER.info("Atomic move not supported, using standard move: {}", e.getMessage());
             Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
         }
@@ -218,7 +218,7 @@ public final class FileDownloadUtils {
                     ? contentLength + actualStartOffset
                     : contentLength;
 
-            // Prepare output stream – append if resuming, otherwise create/truncate
+            // Prepare output stream - append if resuming, otherwise create/truncate
             boolean append = rangeSupported && actualStartOffset > 0 && responseCode == HttpURLConnection.HTTP_PARTIAL;
             StandardOpenOption[] writeOptions = append
                     ? new StandardOpenOption[]{StandardOpenOption.CREATE, StandardOpenOption.APPEND}
@@ -239,7 +239,7 @@ public final class FileDownloadUtils {
                     if (totalExpected > 0) {
                         int percent = (int) (downloaded * 100 / totalExpected);
                         if (percent != lastPercent) {
-                            // Use debug level to avoid console spam – change to INFO only if needed
+                            // Use debug level to avoid console spam - change to INFO only if needed
                             Moonlight.LOGGER.info("Downloading {} ... {}%", tmp.getFileName(), percent);
                             if (progressCallback != null) {
                                 progressCallback.onProgress(percent);

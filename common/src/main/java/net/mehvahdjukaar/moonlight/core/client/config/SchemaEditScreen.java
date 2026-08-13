@@ -17,12 +17,15 @@ import net.mehvahdjukaar.moonlight.api.platform.configs.options.ConfigOption;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.CharacterEvent;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -31,21 +34,16 @@ import java.util.function.Consumer;
 
 import static net.mehvahdjukaar.moonlight.core.client.config.ConfigScreenLayout.*;
 
-/**
- * A schema-driven form editor for a single codec-backed config value ({@link ConfigOption.SchemaValue}). A CodecUI
- * {@link net.mehvahdjukaar.codecui.Schema} is converted (by {@link SchemaForm}) into the same
- * {@link ConfigCategory}/{@link ConfigOption} tree the main config screen renders, and this screen drives it with the
- * exact same rows ({@code OptionRow}/{@code CategoryRow}), controls ({@link ConfigControllers}) and edit session — so a
- * generated form looks and behaves identically to a hand-written config page, with no bespoke widget code.
- *
- * <p>All working edits live in a private {@link ConfigEditSession} (holder-less: nothing here writes to disk) shared
- * across the sub-category navigation stack. Only the root page commits: on <em>Done</em> the form's JSON is reassembled
- * from the session, decoded through the codec, and — if valid — handed back to the outer config screen; sub-record
- * pages just navigate. Follows the "edit on a sub page, hand the result back on Done" shape of {@code JsonEditScreen}.</p>
- */
+// A schema-driven form editor for a single codec-backed config value. SchemaForm converts the schema into the same
+// category/option tree the main config screen renders, and this drives it with the exact same rows, controls and edit
+// session, so a generated form behaves identically to a hand-written config page.
+//
+// Working edits live in a private holder-less ConfigEditSession shared across the sub-category navigation stack;
+// nothing here writes to disk. Only the root page commits: on Done the form's JSON is reassembled from the session,
+// decoded through the codec and, if valid, handed back to the outer config screen. Sub-record pages just navigate.
 public class SchemaEditScreen extends Screen implements ConfigScreenAccess, PopupHost {
 
-    /** Shared state across the whole sub-category navigation stack of one editing visit. */
+    // shared across the whole sub-category navigation stack of one editing visit
     private record State(ConfigEditSession session, SchemaForm.Reader reader, Codec<?> codec, Consumer<Object> onDone) {}
 
     private final State state;
@@ -60,10 +58,7 @@ public class SchemaEditScreen extends Screen implements ConfigScreenAccess, Popu
     @Nullable
     private Component error;
 
-    /**
-     * Opens the editor for a schema-backed config value. The current working value comes from {@code outerSession}; on
-     * Done the decoded object is staged back into it (and {@code onChange} fired), exactly like any other control.
-     */
+    // the current working value comes from outerSession; on Done the decoded object is staged back into it
     public static <T> Screen create(ConfigOption.SchemaValue<T> option, ConfigEditSession outerSession, Runnable onChange) {
         Screen parent = Minecraft.getInstance().screen;
         SchemaCodec<T> codec = option.codec;
@@ -100,8 +95,6 @@ public class SchemaEditScreen extends Screen implements ConfigScreenAccess, Popu
         return parentPage == null;
     }
 
-    // ===== ConfigScreenAccess =====
-
     @Override
     public Font font() {
         return this.font;
@@ -136,21 +129,17 @@ public class SchemaEditScreen extends Screen implements ConfigScreenAccess, Popu
         return own && (parent == null || isCategoryEnabled(parent));
     }
 
-    // ===== PopupHost =====
-
     @Override
     public OverlayLayer getOverlayLayer() {
         return this.overlay;
     }
 
-    // ===== screen =====
-
     @Override
     protected void init() {
         this.overlay.clear();
         SchemaForm.ListCategory listCategory = listCategory();
-        // a list page needs a second button row above the usual one for "add entry". +24 keeps the gap between the
-        // list and the topmost button identical to every other config screen (8px)
+        // a list page needs a second button row for "add entry". +24 keeps the gap between the list and the topmost
+        // button at the usual 8px
         int footer = listCategory != null ? FOOTER + 24 : FOOTER;
         this.list = new ConfigOptionList(this.minecraft, this.width, this.height - HEADER - footer, HEADER, ITEM_HEIGHT);
         populate();
@@ -216,7 +205,7 @@ public class SchemaEditScreen extends Screen implements ConfigScreenAccess, Popu
         List<JsonElement> values = cat.snapshot(state.session);
         values.add(cat.newEntry());
         rebuild(cat, values);
-        this.list.setScrollAmount(this.list.getMaxScroll()); // reveal the entry that was just appended
+        this.list.setScrollAmount(this.list.maxScrollAmount()); // reveal the entry that was just appended
     }
 
     private void removeEntry(SchemaForm.ListCategory cat, int index) {
@@ -226,13 +215,10 @@ public class SchemaEditScreen extends Screen implements ConfigScreenAccess, Popu
         rebuild(cat, values);
     }
 
-    /**
-     * Adding or removing an entry changes the page's row set, so the list node is rebuilt from the JSON its entries
-     * currently hold and the rows regenerated in place. The rows own no state the node doesn't (each was seeded from,
-     * and reads back to, that JSON), so a rebuild round-trips every edit made so far.
-     */
+    // Adding or removing an entry changes the page's row set, so the node is rebuilt from the JSON its entries hold
+    // and the rows regenerated. Rows own no state the node doesn't, so this round-trips every edit made so far
     private void rebuild(SchemaForm.ListCategory cat, List<JsonElement> values) {
-        double scroll = this.list.getScrollAmount();
+        double scroll = this.list.scrollAmount();
         cat.setEntries(values);
         this.overlay.clear(); // the rows are recreated below, and with them any popup one of them had open
         populate();
@@ -241,7 +227,6 @@ public class SchemaEditScreen extends Screen implements ConfigScreenAccess, Popu
         onValueEdited();
     }
 
-    /** Reassembles the form's JSON, decodes it through the codec and, if valid, hands the value back and closes. */
     private void commit() {
         JsonElement json = state.reader.read(state.session);
         DataResult<?> result = state.codec.parse(JsonOps.INSTANCE, json);
@@ -257,13 +242,15 @@ public class SchemaEditScreen extends Screen implements ConfigScreenAccess, Popu
 
     @Override
     public void onClose() {
-        // sub-page: go back up (edits stay in the shared session). root: leave without committing (cancel).
+        // sub-page: go back up, edits stay in the shared session. Root: leave without committing
         this.minecraft.setScreen(isRoot() ? state.session.returnScreen() : parentPage);
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        return overlay.mouseClicked(mouseX, mouseY, button) || super.mouseClicked(mouseX, mouseY, button);
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x(), mouseY = event.y();
+        int button = event.button();
+        return overlay.mouseClicked(event, doubleClick) || super.mouseClicked(event, doubleClick);
     }
 
     @Override
@@ -272,24 +259,24 @@ public class SchemaEditScreen extends Screen implements ConfigScreenAccess, Popu
     }
 
     @Override
-    public boolean keyPressed(int key, int scanCode, int modifiers) {
-        return overlay.keyPressed(key, scanCode, modifiers) || super.keyPressed(key, scanCode, modifiers);
+    public boolean keyPressed(KeyEvent event) {
+        return overlay.keyPressed(event) || super.keyPressed(event);
     }
 
     @Override
-    public boolean charTyped(char c, int modifiers) {
-        return overlay.charTyped(c, modifiers) || super.charTyped(c, modifiers);
+    public boolean charTyped(CharacterEvent event) {
+        return overlay.charTyped(event) || super.charTyped(event);
     }
 
     @Override
-    public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.renderBackground(graphics, mouseX, mouseY, partialTick);
+    public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+        super.extractBackground(graphics, mouseX, mouseY, partialTick);
         GuiHelper.renderHeaderBar(graphics, this.font, this.title, this.width, HEADER);
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
         if (overlay.isOpen()) {
             overlay.render(graphics, mouseX, mouseY);
             return;
@@ -303,12 +290,12 @@ public class SchemaEditScreen extends Screen implements ConfigScreenAccess, Popu
             }
         }
         if (tooltip != null) {
-            graphics.renderTooltip(this.font, this.font.split(tooltip, 220), mouseX, mouseY);
+            graphics.setTooltipForNextFrame(this.font, this.font.split(tooltip, 220), mouseX, mouseY);
         }
         if (this.error != null) {
             // sits just above the button strip, which is one row taller on a list page (the "add entry" button)
             int y = this.height - (listCategory() != null ? 66 : 42);
-            graphics.drawCenteredString(this.font, this.error, this.width / 2, y, ConfigGuiColors.ERROR);
+            graphics.centeredText(this.font, this.error, this.width / 2, y, ConfigGuiColors.ERROR);
         }
     }
 }

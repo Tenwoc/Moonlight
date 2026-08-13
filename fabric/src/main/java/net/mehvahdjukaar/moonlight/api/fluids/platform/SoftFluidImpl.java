@@ -8,7 +8,7 @@ import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariantAttributes;
 import net.mehvahdjukaar.moonlight.api.misc.Triplet;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.material.Fluid;
 import org.jetbrains.annotations.Nullable;
 
@@ -22,7 +22,7 @@ public class SoftFluidImpl {
     }
 
     @Nullable
-    public static Triplet<ResourceLocation, ResourceLocation, Integer> getRenderingData(ResourceLocation useTexturesFrom) {
+    public static Triplet<Identifier, Identifier, Integer> getRenderingData(Identifier useTexturesFrom) {
         var fluid = BuiltInRegistries.FLUID.getOptional(useTexturesFrom);
         if (fluid.isPresent()) {
             var f = fluid.get();

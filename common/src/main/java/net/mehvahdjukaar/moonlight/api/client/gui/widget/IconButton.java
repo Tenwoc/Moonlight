@@ -2,27 +2,28 @@ package net.mehvahdjukaar.moonlight.api.client.gui.widget;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 /**
- * A {@link Button} that draws a GUI sprite just to the LEFT of its label. The label is rendered exactly like a
+ * A Button that draws a GUI sprite just to the LEFT of its label. The label is rendered exactly like a
  * vanilla button (centered, scrolling when too long); the icon is simply placed to the left of that centered text,
- * or centered on its own when there is no label. Vanilla's {@link net.minecraft.client.gui.components.SpriteIconButton}
- * only offers icon-on-the-right ({@code TextAndIcon}) or icon-only ({@code CenteredIcon}), so this covers "[icon] Label".
+ * or centered on its own when there is no label. Vanilla's net.minecraft.client.gui.components.SpriteIconButton
+ * only offers icon-on-the-right (TextAndIcon) or icon-only (CenteredIcon), so this covers "[icon] Label".
  */
 public class IconButton extends Button {
 
     private static final int PAD = 4;
 
-    private final ResourceLocation sprite;
+    private final Identifier sprite;
     private final int spriteWidth;
     private final int spriteHeight;
     private boolean drawBackground = true;
 
-    public IconButton(int x, int y, int width, int height, Component message, ResourceLocation sprite,
+    public IconButton(int x, int y, int width, int height, Component message, Identifier sprite,
                       int spriteWidth, int spriteHeight, OnPress onPress) {
         super(x, y, width, height, message, onPress, DEFAULT_NARRATION);
         this.sprite = sprite;
@@ -41,11 +42,12 @@ public class IconButton extends Button {
     }
 
     @Override
-    public void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+    protected void extractContents(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         int iconY = this.getY() + (this.getHeight() - this.spriteHeight) / 2;
         int iconX;
         if (drawBackground) {
-            super.renderWidget(graphics, mouseX, mouseY, partialTick); // background + vanilla-centered label
+            this.extractDefaultSprite(graphics); // background
+            this.extractDefaultLabel(graphics.textRendererForWidget(this, GuiGraphicsExtractor.HoveredTextEffects.NONE));
             if (hasText()) {
                 // vanilla centers the label on the button's midpoint; drop the icon just left of the text's left edge
                 Font font = Minecraft.getInstance().font;
@@ -60,8 +62,8 @@ public class IconButton extends Button {
             }
             iconX = this.getX() + (this.getWidth() - this.spriteWidth) / 2;
         }
-        if (!this.active) graphics.setColor(0.5f, 0.5f, 0.5f, 1f); // dim the icon to match the disabled button
-        graphics.blitSprite(this.sprite, iconX, iconY, this.spriteWidth, this.spriteHeight);
-        if (!this.active) graphics.setColor(1f, 1f, 1f, 1f);
+        // dim the icon to match the disabled button
+        int tint = this.active ? 0xFFFFFFFF : 0xFF808080;
+        graphics.blitSprite(RenderPipelines.GUI_TEXTURED, this.sprite, iconX, iconY, this.spriteWidth, this.spriteHeight, tint);
     }
 }

@@ -11,9 +11,9 @@ import net.mehvahdjukaar.moonlight.api.platform.configs.options.ConfigOption;
 import net.mehvahdjukaar.moonlight.api.platform.configs.platform.values.*;
 import net.mehvahdjukaar.moonlight.api.resources.assets.LangBuilder;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
-import org.apache.http.annotation.Experimental;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -27,7 +27,7 @@ import java.util.function.Supplier;
 
 public class ConfigBuilderImpl extends ConfigBuilder {
 
-    public static ConfigBuilder create(ResourceLocation name, ConfigType type) {
+    public static ConfigBuilder create(Identifier name, ConfigType type) {
         return new ConfigBuilderImpl(name, type);
     }
 
@@ -35,7 +35,7 @@ public class ConfigBuilderImpl extends ConfigBuilder {
 
     private final Deque<ConfigSubCategory> categoryStack = new ArrayDeque<>();
 
-    public ConfigBuilderImpl(ResourceLocation name, ConfigType type) {
+    public ConfigBuilderImpl(Identifier name, ConfigType type) {
         super(name, type);
         categoryStack.push(mainCategory);
     }
@@ -85,11 +85,8 @@ public class ConfigBuilderImpl extends ConfigBuilder {
         return this;
     }
 
-    /**
-     * Snapshot of the builder's pending change-effect flags, passed into each leaf's constructor as it is defined.
-     * The flags stay set across a compound value's suppressed inner defines (recordOption no-ops while suppressed),
-     * so every leaf of a range/vec3 gets the same meta; they are cleared at the compound boundary in recordOption.
-     */
+    // Snapshot of the builder's pending change-effect flags, taken as each leaf is defined. The flags stay set across
+    // a compound value's suppressed inner defines, so every leaf of a range/vec3 gets the same meta
     private ConfigMetadata pendingMeta() {
         return new ConfigMetadata(this.pendingReload, this.pendingDynamicPacks);
     }
@@ -98,11 +95,7 @@ public class ConfigBuilderImpl extends ConfigBuilder {
         doAddConfig(name, config, ConfigBuilderImpl::toOption);
     }
 
-    /**
-     * As {@link #doAddConfig(String, ConfigValue)} but with an explicit screen-row factory, so codec-backed values that
-     * want a richer row than the default {@link #toOption} mapping (e.g. {@link #defineObject} → an editable
-     * {@link ConfigOption.SchemaValue} instead of an {@link ConfigOption.UnsupportedValue}) can supply their own.
-     */
+    // with an explicit screen-row factory, for values wanting a richer row than the default toOption mapping
     private void doAddConfig(String name, ConfigValue<?> config, Function<ConfigValue<?>, ConfigOption<?>> optionFactory) {
         config.setTranslationKey(this.translationKey(name));
         addTranslationsAndComments(name);
@@ -110,19 +103,16 @@ public class ConfigBuilderImpl extends ConfigBuilder {
         Objects.requireNonNull(this.categoryStack.peek()).addEntry(config);
         if (this.categoryStack.size() <= 1 && PlatHelper.isDev()) throw new AssertionError();
 
-        // build the matching screen row; the comment (before or after) fills in its description and file comment
+        // the comment, before or after, fills in the row's description
         if (!suppressUi) {
             ConfigOption<?> option = optionFactory.apply(config);
             recordOption(option);
-            noteDefined(name, option, raw -> {
-                config.setRawComment(raw);
-                config.setCommentKey(this.tooltipKey(name));
-            });
+            noteDefined(name, option, raw -> config.setCommentKey(this.tooltipKey(name)));
         }
     }
 
-    /** Translates a stored value into the matching loader independent screen row. Description is left empty here;
-     * {@code comment(...)} fills it in later (before or after the define) via {@code noteDefined}. */
+    // Translates a stored value into the matching loader independent screen row. Description is left empty here,
+    // comment(...) fills it in later through noteDefined
     private static ConfigOption<?> toOption(ConfigValue<?> v) {
         Component title = v.getTranslation();
         boolean slider = v.isSlider();
@@ -187,7 +177,7 @@ public class ConfigBuilderImpl extends ConfigBuilder {
         return config;
     }
 
-    @Experimental
+    @ApiStatus.Experimental
     @Override
     public Supplier<Float> define(String name, float defaultValue, float min, float max) {
         var config = new FloatConfigValue(name, defaultValue, min, max, pendingMeta());
@@ -301,7 +291,7 @@ public class ConfigBuilderImpl extends ConfigBuilder {
 
     @Override
     public <T> Supplier<T> defineObject(String name, com.google.common.base.Supplier<T> defaultValue, Codec<T> rawCodec) {
-        // SchemaCodec IS a Codec (identical wire format), so this gives an editable schema-driven row for free
+        // SchemaCodec is a Codec with the same wire format, so wrapping also gets us the editable row
         SchemaCodec<T> codec = SchemaCodec.wrap(rawCodec);
         var config = new ObjectConfigValue<>(name, defaultValue, codec, pendingMeta());
         doAddConfig(name, config, c -> new ConfigOption.SchemaValue<>(

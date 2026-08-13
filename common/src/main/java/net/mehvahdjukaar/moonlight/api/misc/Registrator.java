@@ -1,14 +1,14 @@
 package net.mehvahdjukaar.moonlight.api.misc;
 
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 @FunctionalInterface
 public interface Registrator<T> {
 
-    void register(ResourceLocation name, T instance);
+    void register(Identifier name, T instance);
 
     default void register(String name, T instance) {
-        register(ResourceLocation.parse(name), instance);
+        register(Identifier.parse(name), instance);
     }
 
 }

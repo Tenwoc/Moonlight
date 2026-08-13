@@ -4,46 +4,44 @@ import net.mehvahdjukaar.moonlight.api.platform.configs.ConfigType;
 import net.mehvahdjukaar.moonlight.api.platform.configs.options.ConfigReloadType;
 import net.mehvahdjukaar.moonlight.core.Moonlight;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
-/**
- * Shared sizing/color constants and small drawing helpers for the config screen widgets. Kept in one place so the
- * screen, list, rows and control providers all agree on the grid.
- */
+// Shared sizing constants and drawing helpers for the config screen widgets, in one place so the screen, list, rows
+// and control providers all agree on the grid.
 final class ConfigScreenLayout {
 
-    /** Left-aligned single-line text hard-clipped (scissored) to {@code [minX, maxX]} — used for row subtitles. */
-    static void drawClipped(GuiGraphics graphics, Font font, Component text, int minX, int y, int maxX, int color) {
+    // left-aligned single-line text hard-clipped to [minX, maxX], for row subtitles
+    static void drawClipped(GuiGraphicsExtractor graphics, Font font, Component text, int minX, int y, int maxX, int color) {
         graphics.enableScissor(minX, y - 1, maxX, y + font.lineHeight + 1);
-        graphics.drawString(font, text, minX, y, color);
+        graphics.text(font, text, minX, y, color);
         graphics.disableScissor();
     }
 
     // gui sprites (assets/moonlight/textures/gui/sprites/{yes,no,save}.png)
-    static final ResourceLocation ON_ICON = Moonlight.res("yes");
-    static final ResourceLocation OFF_ICON = Moonlight.res("no");
-    static final ResourceLocation SAVE_ICON = Moonlight.res("save");
-    static final ResourceLocation CONFIG_ICON = Moonlight.res("config");
-    static final ResourceLocation CLIENT_CONFIG_ICON = Moonlight.res("config_client");
-    static final ResourceLocation SERVER_CONFIG_ICON = Moonlight.res("config_server");
-    static final ResourceLocation COMMON_CONFIG_ICON = Moonlight.res("config_common");
-    static final ResourceLocation FOLDER_ICON = Moonlight.res("folder");
-    static final ResourceLocation SEARCH_ICON = Moonlight.res("search");
-    static final ResourceLocation RESET_ICON = Moonlight.res("reset");
-    static final ResourceLocation DELETE_ICON = Moonlight.res("delete");
-    static final ResourceLocation EDIT_ICON = Moonlight.res("edit");
-    static final ResourceLocation WORLD_RELOAD_ICON = Moonlight.res("world_reload");
-    static final ResourceLocation GAME_RESTART_ICON = Moonlight.res("game_restart");
+    static final Identifier ON_ICON = Moonlight.res("yes");
+    static final Identifier OFF_ICON = Moonlight.res("no");
+    static final Identifier SAVE_ICON = Moonlight.res("save");
+    static final Identifier CONFIG_ICON = Moonlight.res("config");
+    static final Identifier CLIENT_CONFIG_ICON = Moonlight.res("config_client");
+    static final Identifier SERVER_CONFIG_ICON = Moonlight.res("config_server");
+    static final Identifier COMMON_CONFIG_ICON = Moonlight.res("config_common");
+    static final Identifier FOLDER_ICON = Moonlight.res("folder");
+    static final Identifier SEARCH_ICON = Moonlight.res("search");
+    static final Identifier RESET_ICON = Moonlight.res("reset");
+    static final Identifier DELETE_ICON = Moonlight.res("delete");
+    static final Identifier EDIT_ICON = Moonlight.res("edit");
+    static final Identifier WORLD_RELOAD_ICON = Moonlight.res("world_reload");
+    static final Identifier GAME_RESTART_ICON = Moonlight.res("game_restart");
     // 7x7 disclosure triangles for expandable option descriptions
-    static final ResourceLocation SECTION_COLLAPSED_ICON = Moonlight.res("widget/section_collapsed");
-    static final ResourceLocation SECTION_EXPANDED_ICON = Moonlight.res("widget/section_expanded");
+    static final Identifier SECTION_COLLAPSED_ICON = Moonlight.res("widget/section_collapsed");
+    static final Identifier SECTION_EXPANDED_ICON = Moonlight.res("widget/section_expanded");
 
-    /** The reload/restart hint sprite for a value, or null when it applies immediately. */
+    // null when the value applies immediately
     @Nullable
-    static ResourceLocation reloadIcon(ConfigReloadType type) {
+    static Identifier reloadIcon(ConfigReloadType type) {
         return switch (type) {
             case WORLD_RELOAD -> WORLD_RELOAD_ICON;
             case GAME_RESTART -> GAME_RESTART_ICON;
@@ -51,8 +49,7 @@ final class ConfigScreenLayout {
         };
     }
 
-    /** The paper "config file" sprite for a config's type, distinguishing client / server-synced / common. */
-    static ResourceLocation configFileIcon(ConfigType type) {
+    static Identifier configFileIcon(ConfigType type) {
         return switch (type) {
             case CLIENT -> CLIENT_CONFIG_ICON;
             case COMMON_SYNCED -> SERVER_CONFIG_ICON;
@@ -75,5 +72,5 @@ final class ConfigScreenLayout {
 
     static final int DESC_LINES_PER_ROW = 2;
 
-    // Colors are NOT redeclared here: reference net.mehvahdjukaar.moonlight.api.client.gui.misc.ConfigGuiColors directly.
+    // colors live in ConfigGuiColors, not here
 }

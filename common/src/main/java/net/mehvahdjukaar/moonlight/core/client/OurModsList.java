@@ -13,21 +13,16 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * The author's full catalog of mods, fetched on demand from the {@code mod_pages} repo the first time the
- * "discover mods" screen is opened. Purely cosmetic: it powers a screen that advertises the other mods, showing
- * the ones you don't have installed grayed out. Never fails hard - if the fetch dies the screen just shows an
- * "offline" message.
- */
+// The author's full catalog of mods, fetched on demand from the mod_pages repo the first time the "discover mods" screen
+// is opened. Purely cosmetic: it powers a screen that advertises the other mods, showing the ones you don't have
+// installed grayed out. Never fails hard - if the fetch dies the screen just shows an "offline" message.
 @ApiStatus.Internal
 public final class OurModsList {
 
     public enum State {NOT_STARTED, LOADING, LOADED, FAILED}
 
-    /**
-     * One catalog entry. {@code modId} is what we check against the loaded mod list to decide installed-or-not.
-     * The urls/icon are optional; a missing icon falls back to a letter tile, missing urls just aren't clickable.
-     */
+    // One catalog entry. modId is what we check against the loaded mod list to decide installed-or-not. The urls/icon
+    // are optional; a missing icon falls back to a letter tile, missing urls just aren't clickable.
     public record Entry(String modId, String name, String description,
                         @Nullable String iconUrl, @Nullable String curseforgeUrl, @Nullable String modrinthUrl) {
 
@@ -59,9 +54,7 @@ public final class OurModsList {
         return mods;
     }
 
-    /**
-     * Kicks off the one-time background fetch. Safe to call every time the screen opens; only the first does work.
-     */
+    // Kicks off the one-time background fetch. Safe to call every time the screen opens; only the first does work.
     public static synchronized void fetchIfNeeded() {
         if (state == State.LOADING || state == State.LOADED) return;
         state = State.LOADING;

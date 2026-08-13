@@ -22,7 +22,7 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerEntity;
 import net.minecraft.server.level.ServerLevel;
@@ -222,8 +222,8 @@ public class PlatHelper {
         throw new AssertionError();
     }
 
-    /** Mod's CurseForge page url, declared in {@code fabric.mod.json#contact.curseforge}
-     *  or {@code neoforge.mods.toml [[mods]] curseforge}. {@code null} when unset. */
+    /** Mod's CurseForge page url, declared in fabric.mod.json#contact.curseforge
+     *  or neoforge.mods.toml [[mods]] curseforge. null when unset. */
     @Nullable
     @PlatformImpl
     @Contract
@@ -231,8 +231,8 @@ public class PlatHelper {
         throw new AssertionError();
     }
 
-    /** Mod's Modrinth page url, declared in {@code fabric.mod.json#contact.modrinth}
-     *  or {@code neoforge.mods.toml [[mods]] modrinth}. {@code null} when unset. */
+    /** Mod's Modrinth page url, declared in fabric.mod.json#contact.modrinth
+     *  or neoforge.mods.toml [[mods]] modrinth. null when unset. */
     @Nullable
     @PlatformImpl
     @Contract
@@ -240,8 +240,8 @@ public class PlatHelper {
         throw new AssertionError();
     }
 
-    /** Mod's source-code url, declared in {@code fabric.mod.json#contact.sources}
-     *  or {@code neoforge.mods.toml [[mods]] sources}. {@code null} when unset. */
+    /** Mod's source-code url, declared in fabric.mod.json#contact.sources
+     *  or neoforge.mods.toml [[mods]] sources. null when unset. */
     @Nullable
     @PlatformImpl
     @Contract
@@ -263,7 +263,7 @@ public class PlatHelper {
 
     /**
      * A path inside the mod's jar (or its classes directory in dev), or null when the mod has nothing there. Works for
-     * directories too, so it can answer "does this mod ship the {@code net/mehvahdjukaar} package".
+     * directories too, so it can answer "does this mod ship the net/mehvahdjukaar package".
      */
     @Nullable
     @PlatformImpl
@@ -273,7 +273,7 @@ public class PlatHelper {
 
     /**
      * The mod's declared authors, empty when it declares none. Fabric returns one entry per author; NeoForge has a
-     * single free-form {@code authors} string, which is returned as is (usually already comma separated).
+     * single free-form authors string, which is returned as is (usually already comma separated).
      */
     @PlatformImpl
     public static List<String> getModAuthors(String modId) {
@@ -320,11 +320,6 @@ public class PlatHelper {
     @PlatformImpl
     public static List<String> getInstalledMods() {
         throw new AssertionError();
-    }
-
-    @Deprecated(forRemoval = true)
-    public static void registerResourcePack(PackType packType, Supplier<Pack> packSupplier) {
-        RegHelper.registerResourcePack(packType, packSupplier);
     }
 
     @Contract
@@ -420,25 +415,14 @@ public class PlatHelper {
         throw new AssertionError();
     }
 
-    //TODO: move to reg
-    @Deprecated(forRemoval = true)
-    public static void addServerReloadListener(PreparableReloadListener listener, ResourceLocation location) {
-        addServerReloadListener(provider -> listener, location);
-    }
-
     @PlatformImpl
-    public static void addServerReloadListener(Function<HolderLookup.Provider, PreparableReloadListener> listener, ResourceLocation location) {
+    public static void addServerReloadListener(Function<HolderLookup.Provider, PreparableReloadListener> listener, Identifier location) {
         throw new AssertionError();
     }
 
     @PlatformImpl
     public static void openCustomMenu(ServerPlayer player, MenuProvider menuProvider, Consumer<RegistryFriendlyByteBuf> extraDataProvider) {
         throw new AssertionError();
-    }
-
-    @Deprecated(forRemoval = true)
-    public static void openCustomMenu(ServerPlayer player, MenuProvider menuProvider, BlockPos pos) {
-        openCustomMenu(player, menuProvider, buf -> buf.writeBlockPos(pos));
     }
 
     public static <T extends Entity & MenuProvider> void openCustomMenu(ServerPlayer player, T menuProvider) {

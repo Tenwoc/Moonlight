@@ -14,15 +14,11 @@ public class ClientConfigs {
     public static final Supplier<Boolean> LAZY_MAP_DATA;
     public static final Supplier<Integer> MAPS_MIPMAP;
     public static final Supplier<ShadeFix> FIX_SHADE;
-    public static final Supplier<Boolean> DEBUG_RENDERS;
     public static final Supplier<TooltipMode> TAGS_TOOLTIP;
     public static final Supplier<Boolean> CUSTOM_CONFIG_SCREEN;
     public static final Supplier<Boolean> SHOW_ALL_MOD_CONFIGS;
     public static final Supplier<Boolean> CONVERT_FOREIGN_CONFIGS;
     public static final Supplier<Boolean> CONFIG_ITEM_CAROUSEL;
-
-    @Deprecated(forRemoval = true)
-    public static final Supplier<Boolean> BLOCKTYPES_DEBUG = () -> false;
 
     public static final ModConfigHolder CONFIG;
 
@@ -41,9 +37,6 @@ public class ClientConfigs {
                         "Using no gui will prevent it from changing item rendered in GUIs, in case you dont like that look." +
                         "Note there is a known compat issue with Figura mod. Keep this True or False with that one")
                 .define("consistent_entity_renderer_shading", ShadeFix.NO_GUI);
-
-        DEBUG_RENDERS = builder.comment("Enables some debug renderers. Require the use of the /supp debug command to enable their data being sent")
-                .define("debug_renderers", PlatHelper.isDev());
 
         TAGS_TOOLTIP = builder.comment("Show Item and Block tags on item tooltip")
                 .define("tags_tooltips", PlatHelper.isDev() ? TooltipMode.ON : TooltipMode.OFF);

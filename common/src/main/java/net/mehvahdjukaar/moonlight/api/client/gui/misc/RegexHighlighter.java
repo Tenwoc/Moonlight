@@ -8,8 +8,8 @@ import java.util.regex.Pattern;
 /**
  * Lightweight regex syntax highlighter. Classifies each character of the pattern (escapes, character classes,
  * groups, quantifiers, anchors) into a color; a pattern that doesn't compile is drawn entirely in red. This is a
- * coloring scan, not a full parser. Typically bound to a single-line {@link EditBox} via
- * {@code box.setFormatter(RegexHighlighter.INSTANCE.formatter(box))}.
+ * coloring scan, not a full parser. Typically bound to a single-line EditBox via
+ * box.setFormatter(RegexHighlighter.INSTANCE.formatter(box)).
  */
 public final class RegexHighlighter implements SyntaxHighlighter {
 

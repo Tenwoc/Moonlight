@@ -14,7 +14,8 @@ import net.mehvahdjukaar.moonlight.api.platform.configs.options.ConfigNode;
 import net.mehvahdjukaar.moonlight.api.platform.configs.options.ConfigOption;
 import net.mehvahdjukaar.moonlight.api.platform.configs.options.ConfigReloadType;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
@@ -24,8 +25,11 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TextColor;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.CharacterEvent;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -36,7 +40,7 @@ import static net.mehvahdjukaar.moonlight.core.client.config.ConfigScreenLayout.
 
 public class MoonlightConfigScreen extends Screen implements ConfigScreenAccess, PopupHost {
 
-    // reused so re-opening/leaving repeatedly refreshes one toast instead of stacking duplicates
+    // reused so leaving repeatedly refreshes one toast instead of stacking duplicates
     private static final SystemToast.SystemToastId RELOAD_TOAST_ID = new SystemToast.SystemToastId();
 
     private final ConfigEditSession session;
@@ -44,7 +48,7 @@ public class MoonlightConfigScreen extends Screen implements ConfigScreenAccess,
     @Nullable
     private final MoonlightConfigScreen parentConfig; // null = root level
     @Nullable
-    private final ResourceLocation background;
+    private final Identifier background;
 
     // top-bar geometry: title centered on the first line, breadcrumb + search on the second
     private static final int SIDE_MARGIN = 14;
@@ -60,16 +64,16 @@ public class MoonlightConfigScreen extends Screen implements ConfigScreenAccess,
     private final OverlayLayer overlay = new OverlayLayer(); // floats an open dropdown/popup above the list
 
     public MoonlightConfigScreen(ModConfigHolder holder, ConfigCategory root, Screen returnScreen,
-                                 @Nullable ResourceLocation background) {
+                                 @Nullable Identifier background) {
         this(root, null, new ConfigEditSession(holder, returnScreen), background);
     }
 
     public static Screen create(ModConfigHolder holder, ConfigCategory root, Screen returnScreen,
-                                @Nullable ResourceLocation background) {
+                                @Nullable Identifier background) {
         return new MoonlightConfigScreen(holder, root, returnScreen, background);
     }
 
-    private MoonlightConfigScreen(ConfigCategory category, @Nullable MoonlightConfigScreen parentConfig, ConfigEditSession session, @Nullable ResourceLocation background) {
+    private MoonlightConfigScreen(ConfigCategory category, @Nullable MoonlightConfigScreen parentConfig, ConfigEditSession session, @Nullable Identifier background) {
         // the header keeps the config's own name on every sub-screen; the breadcrumb is what tracks the category
         super(session.holder().getReadableName());
         this.category = category;
@@ -81,8 +85,6 @@ public class MoonlightConfigScreen extends Screen implements ConfigScreenAccess,
     private boolean isRoot() {
         return parentConfig == null;
     }
-
-    // ===== ConfigScreenView =====
 
     @Override
     public Font font() {
@@ -128,8 +130,8 @@ public class MoonlightConfigScreen extends Screen implements ConfigScreenAccess,
         this.overlay.clear(); // widgets are rebuilt here, so drop any stale open popup
         this.list = new ConfigOptionList(this.minecraft, this.width, this.height - HEADER - FOOTER, HEADER, ITEM_HEIGHT);
 
-        // top bar: a search box on the right, then a breadcrumb trail (walk up the parent chain) filling the space
-        // to its left. Both are registered for input here but drawn in render(), on top of the header bar.
+        // search box on the right, breadcrumb trail filling the space to its left. Both are registered for input
+        // here but drawn in render(), on top of the header bar
         this.searchBox = new EditBox(this.font, this.width - SIDE_MARGIN - SEARCH_WIDTH, CRUMB_Y - 3,
                 SEARCH_WIDTH, SEARCH_HEIGHT, Component.translatable("gui.moonlight.config.search"));
         this.searchBox.setHint(Component.translatable("gui.moonlight.config.search")
@@ -143,7 +145,7 @@ public class MoonlightConfigScreen extends Screen implements ConfigScreenAccess,
 
         List<BreadcrumbWidget.Crumb> crumbs = new ArrayList<>();
         for (MoonlightConfigScreen s = this; s != null; s = s.parentConfig) {
-            Component label = s.isRoot() ? Component.literal("⌂") : s.category.title(); // ⌂ home
+            Component label = s.isRoot() ? Component.literal("⌂") : s.category.title(); // home icon
             crumbs.addFirst(new BreadcrumbWidget.Crumb(label, s, s == this));
         }
         int trailRight = this.searchBox.getX() - SEARCH_ICON_SIZE - 6; // leave room for the magnifier glyph + a gap
@@ -156,9 +158,8 @@ public class MoonlightConfigScreen extends Screen implements ConfigScreenAccess,
         populate();
         this.addRenderableWidget(this.list);
 
-        // Bottom bar: [Reset all] Save | Back, all the same size. Save (with its live unsaved counter) and Back
-        // are on every page; the session is shared across the navigation stack so Save persists sub-category edits
-        // too. Reset all only shows at the root/home page, since it acts on the whole config.
+        // [Reset all] Save | Back, all the same size. The session is shared across the navigation stack so Save
+        // persists sub-category edits too. Reset all only shows at the root page, since it acts on the whole config
         int y = this.height - 28;
         int bw = 100, gap = 4;
         if (isRoot()) {
@@ -181,7 +182,6 @@ public class MoonlightConfigScreen extends Screen implements ConfigScreenAccess,
         refreshSave();
     }
 
-    /** Asks for confirmation, then resets every value in the config to its default and saves immediately. */
     private void confirmResetAll() {
         this.minecraft.setScreen(new ConfirmScreen(confirmed -> {
             if (confirmed) {
@@ -194,7 +194,7 @@ public class MoonlightConfigScreen extends Screen implements ConfigScreenAccess,
                 Component.translatable("gui.moonlight.config.reset_all.message")));
     }
 
-    /** Recursively stages the default value of every editable option in {@code cat} and its sub-categories. */
+    // stages (does not save) the default of every editable option in cat and its sub-categories
     private void resetAllToDefaults(ConfigCategory cat) {
         for (ConfigNode e : cat.entries()) {
             if (e instanceof ConfigCategory sub) {
@@ -205,16 +205,14 @@ public class MoonlightConfigScreen extends Screen implements ConfigScreenAccess,
         }
     }
 
-    /**
-     * (Re)builds the visible row list. Value rows whose description is expanded get read-only
-     * {@link DescriptionRow}s inserted beneath them; expanded state lives in the session so it survives this.
-     */
+    // (re)builds the visible row list. A value row whose description is expanded gets read-only DescriptionRows
+    // inserted beneath it; the expanded state lives in the session so it survives this
     private void populate() {
         List<ConfigListRow> rows = new ArrayList<>();
         String query = searchQuery == null ? "" : searchQuery.trim().toLowerCase(Locale.ROOT);
         if (query.isEmpty()) {
             for (ConfigNode e : category.entries()) {
-                // the gate shows as a normal (checkmark-styled) row here AND as the parent screen's inline toggle
+                // the gate shows as a normal checkmark row here AND as the parent screen's inline toggle
                 if (e instanceof ConfigCategory cat) {
                     rows.add(new CategoryRow(this, cat));
                 } else if (e instanceof ConfigOption<?> v) {
@@ -273,8 +271,8 @@ public class MoonlightConfigScreen extends Screen implements ConfigScreenAccess,
 
     @Override
     public void onClose() {
-        // leaving the config entirely (root → return screen) with pending edits would silently drop them: confirm first.
-        // going back to a parent category stays within the shared session, so nothing is lost and no prompt is needed.
+        // leaving the config entirely with pending edits would silently drop them, so confirm first. Going back to a
+        // parent category stays within the shared session, so nothing is lost
         if (isRoot() && session.unsavedCount() > 0) {
             this.minecraft.setScreen(new ConfirmScreen(discard -> {
                 if (discard) leaveConfig();
@@ -289,25 +287,26 @@ public class MoonlightConfigScreen extends Screen implements ConfigScreenAccess,
         else this.minecraft.setScreen(parentConfig);
     }
 
-    /** Returns to the screen the config was opened from, warning (via toast) if any saved change needs a reload. */
+    // back to the screen the config was opened from, warning via toast if any saved change needs a reload
     private void leaveConfig() {
         ConfigReloadType reload = session.appliedReload();
         if (reload != ConfigReloadType.NONE) {
             Component message = Component.translatable(reload == ConfigReloadType.GAME_RESTART
                     ? "gui.moonlight.config.reload_needed.game" : "gui.moonlight.config.reload_needed.world");
-            this.minecraft.getToasts().addToast(SystemToast.multiline(this.minecraft, RELOAD_TOAST_ID,
+            this.minecraft.getToastManager().addToast(SystemToast.multiline(this.minecraft, RELOAD_TOAST_ID,
                     Component.translatable("gui.moonlight.config.reload_needed.title"), message));
         }
         this.minecraft.setScreen(session.returnScreen());
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x(), mouseY = event.y();
         // an open dropdown popup floats above everything, so it gets first refusal on clicks
-        if (overlay.mouseClicked(mouseX, mouseY, button)) {
+        if (overlay.mouseClicked(event, doubleClick)) {
             return true;
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(event, doubleClick);
     }
 
     @Override
@@ -320,36 +319,36 @@ public class MoonlightConfigScreen extends Screen implements ConfigScreenAccess,
     }
 
     @Override
-    public boolean keyPressed(int key, int scanCode, int modifiers) {
-        if (overlay.keyPressed(key, scanCode, modifiers)) {
+    public boolean keyPressed(KeyEvent event) {
+        if (overlay.keyPressed(event)) {
             return true;
         }
-        return super.keyPressed(key, scanCode, modifiers);
+        return super.keyPressed(event);
     }
 
     @Override
-    public boolean charTyped(char c, int modifiers) {
-        if (overlay.charTyped(c, modifiers)) {
+    public boolean charTyped(CharacterEvent event) {
+        if (overlay.charTyped(event)) {
             return true;
         }
-        return super.charTyped(c, modifiers);
+        return super.charTyped(event);
     }
 
     @Override
-    public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.renderBackground(graphics, mouseX, mouseY, partialTick);
+    public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+        super.extractBackground(graphics, mouseX, mouseY, partialTick);
         // header chrome sits in the background layer (drawn before the widgets by super.render): the bar, its
         // separator, the title and the search magnifier. The row list is scissored below HEADER, so rows slide
         // under the bar cleanly; the breadcrumb and search box are renderable widgets drawn on top of it.
         GuiHelper.renderHeaderBar(graphics, this.width, HEADER);
-        graphics.drawCenteredString(this.font, this.title, this.width / 2, 7, ConfigGuiColors.TITLE);
-        graphics.blitSprite(SEARCH_ICON, this.searchBox.getX() - SEARCH_ICON_SIZE - 2,
+        graphics.centeredText(this.font, this.title, this.width / 2, 7, ConfigGuiColors.TITLE);
+        graphics.blitSprite(RenderPipelines.GUI_TEXTURED, SEARCH_ICON, this.searchBox.getX() - SEARCH_ICON_SIZE - 2,
                 this.searchBox.getY() + (SEARCH_HEIGHT - SEARCH_ICON_SIZE) / 2, SEARCH_ICON_SIZE, SEARCH_ICON_SIZE);
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
 
         // no row tooltips while a dropdown is open (its popup covers the rows)
         if (!overlay.isOpen()) {
@@ -358,7 +357,7 @@ public class MoonlightConfigScreen extends Screen implements ConfigScreenAccess,
             if (hovered != null) {
                 tooltip = hovered.getTooltip(mouseX, mouseY);
             }
-            // gutter decorations (e.g. reload-hint icons) sit outside the row hover band, so scan all rows for them
+            // gutter decorations (reload-hint icons) sit outside the row hover band, so scan all rows for them
             if (tooltip == null) {
                 for (ConfigListRow row : this.list.children()) {
                     tooltip = row.getGutterTooltip(mouseX, mouseY);
@@ -366,7 +365,7 @@ public class MoonlightConfigScreen extends Screen implements ConfigScreenAccess,
                 }
             }
             if (tooltip != null) {
-                graphics.renderTooltip(this.font, this.font.split(tooltip, 220), mouseX, mouseY);
+                graphics.setTooltipForNextFrame(this.font, this.font.split(tooltip, 220), mouseX, mouseY);
             }
         } else {
             overlay.render(graphics, mouseX, mouseY);

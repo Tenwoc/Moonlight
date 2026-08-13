@@ -2,18 +2,20 @@ package net.mehvahdjukaar.moonlight.api.client.gui.widget;
 
 import net.mehvahdjukaar.moonlight.api.client.gui.GuiHelper;
 import net.mehvahdjukaar.moonlight.api.client.gui.misc.ConfigGuiColors;
-import net.minecraft.Util;
+import net.minecraft.util.Util;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
-import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.input.MouseButtonInfo;
 import net.minecraft.client.resources.language.I18n;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.util.FastColor;
+import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
 import net.minecraft.world.flag.FeatureFlagSet;
 import net.minecraft.world.flag.FeatureFlags;
@@ -28,11 +30,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * A decorative strip of items panning slowly sideways and fading out into its own background at both edges. Meant to
- * show off what a mod adds on its config screens.
- * <p>
- * Not clickable (clicks fall straight through), but hovering it names the item under the cursor and eases the panning
- * to a stop so there's time to actually read it, and the mouse wheel flicks the strip along.
+ * A decorative strip of items panning slowly sideways and fading into its own background at both edges, to show off
+ * what a mod adds on its config screens. Clicks fall straight through, but hovering names the item under the cursor
+ * and eases the panning to a stop so there's time to read it, and the wheel flicks the strip along.
  */
 public class ItemCarouselWidget extends AbstractWidget {
 
@@ -63,31 +63,29 @@ public class ItemCarouselWidget extends AbstractWidget {
         super(x, y, width, height, Component.empty());
         this.items = items;
         this.span = items.size() * (double) CELL;
-        // inactive purely so it stays out of the tab order and lets clicks fall through to whatever is underneath;
-        // rendering, the hover tooltip and the scroll handler don't look at this flag
+        // inactive purely to stay out of the tab order and let clicks fall through. Rendering, the hover tooltip and
+        // the scroll handler don't look at this flag
         this.active = false;
     }
 
-    /** The carousel of every item {@code modId} registers, or null when it registers none. */
+    /** The carousel of every item a mod registers, or null when it registers none. */
     @Nullable
     public static ItemCarouselWidget forMod(String modId, int x, int y, int width, int height) {
         List<ItemStack> items = itemsOf(modId);
         return items.isEmpty() ? null : new ItemCarouselWidget(x, y, width, height, items);
     }
 
-    /**
-     * The items in {@code modId}'s namespace worth showing off, in registry order (which is usually the author's own
-     * grouping), skipping the ones that aren't finished content: feature flag gated items, items with no name in the
-     * current language, and items with no model (they'd draw as the missing-model cube). Creative tab membership would
-     * be the ideal filter, but the tabs stay empty until the player opens the creative menu, so it isn't usable here.
-     */
+    // The items worth showing off, in registry order (usually the author's own grouping), minus the ones that aren't
+    // finished content: feature flag gated, unnamed in the current language, or modelless (they'd draw as the missing
+    // model cube). Creative tab membership would be the ideal filter, but the tabs stay empty until the player opens
+    // the creative menu
     public static List<ItemStack> itemsOf(String modId) {
         return MOD_ITEMS.computeIfAbsent(modId, id -> {
             Level level = Minecraft.getInstance().level;
             FeatureFlagSet features = level == null ? FeatureFlags.DEFAULT_FLAGS : level.enabledFeatures();
             List<ItemStack> found = new ArrayList<>();
             for (Map.Entry<ResourceKey<Item>, Item> e : BuiltInRegistries.ITEM.entrySet()) {
-                if (!e.getKey().location().getNamespace().equals(id)) continue;
+                if (!e.getKey().identifier().getNamespace().equals(id)) continue;
                 Item item = e.getValue();
                 if (!item.isEnabled(features) || !I18n.exists(item.getDescriptionId())) continue;
                 ItemStack stack = item.getDefaultInstance();
@@ -100,8 +98,9 @@ public class ItemCarouselWidget extends AbstractWidget {
     }
 
     private static boolean hasNoModel(ItemStack stack) {
-        Minecraft mc = Minecraft.getInstance();
-        return mc.getItemRenderer().getModel(stack, null, null, 0) == mc.getModelManager().getMissingModel();
+        Identifier modelId = stack.get(DataComponents.ITEM_MODEL);
+        // asking the model manager for it would resolve to the missing model AND log a warning, so look it up directly
+        return modelId == null || !Minecraft.getInstance().getModelManager().bakedItemStackModels.containsKey(modelId);
     }
 
     /** The color the strip sits on and fades into at its edges. Must match whatever is behind it. */
@@ -110,18 +109,17 @@ public class ItemCarouselWidget extends AbstractWidget {
         return this;
     }
 
-    /** Frames the strip with a 1px outline. Off by default. */
     public ItemCarouselWidget withOutline(int argb) {
         this.outline = argb;
         return this;
     }
 
     @Override
-    protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+    protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         int right = this.getX() + this.width;
         int bottom = this.getY() + this.height;
         graphics.fill(this.getX(), this.getY(), right, bottom, this.background);
-        if (this.outline != null) graphics.renderOutline(this.getX(), this.getY(), this.width, this.height, this.outline);
+        if (this.outline != null) graphics.outline(this.getX(), this.getY(), this.width, this.height, this.outline);
         if (this.items.isEmpty()) return;
 
         advance(this.isHovered);
@@ -129,35 +127,33 @@ public class ItemCarouselWidget extends AbstractWidget {
         int fade = Math.min(FADE, this.width / 3);
         int firstCell = Mth.floor(this.offset / CELL);
         double shift = this.offset - firstCell * (double) CELL; // [0, CELL)
-        // renderFakeItem only takes whole pixels, so the sub-pixel remainder rides on the pose instead: without it
-        // the strip would jump a full pixel at a time, which at this speed reads as a stutter
+        // renderFakeItem only takes whole pixels, so the sub-pixel remainder rides on the pose. Without it the strip
+        // jumps a full pixel at a time, which at this speed reads as a stutter
         int wholeShift = (int) shift;
         float subShift = (float) (shift - wholeShift);
         int iconY = this.getY() + (this.height - ICON) / 2;
         int hovered = -1;
 
         graphics.enableScissor(this.getX(), this.getY(), right, bottom);
-        graphics.pose().pushPose();
-        graphics.pose().translate(-subShift, 0, 0);
+        graphics.pose().pushMatrix();
+        graphics.pose().translate(-subShift, 0f);
         for (int i = 0, cells = this.width / CELL + 2; i <= cells; i++) {
             int x = this.getX() + i * CELL + GAP / 2 - wholeShift;
             int index = Math.floorMod(firstCell + i, this.items.size());
-            graphics.renderFakeItem(this.items.get(index), x, iconY);
-            // only the fully lit middle band gets a tooltip; items dissolving into the edges aren't really readable
+            graphics.fakeItem(this.items.get(index), x, iconY);
+            // only the fully lit middle band gets a tooltip, items dissolving into the edges aren't readable
             float drawnX = x - subShift;
             if (this.isHovered && mouseX >= drawnX && mouseX < drawnX + ICON
                     && mouseX >= this.getX() + fade && mouseX < right - fade) {
                 hovered = index;
             }
         }
-        graphics.pose().popPose();
+        graphics.pose().popMatrix();
         graphics.disableScissor();
 
-        // guiOverlay skips the depth test, so the fade actually covers the items instead of being clipped by them
-        int transparent = FastColor.ARGB32.color(0, this.background);
-        RenderType overItems = RenderType.guiOverlay();
-        GuiHelper.fillGradientHorizontal(graphics, overItems, this.getX(), this.getY(), this.getX() + fade, bottom, this.background, transparent);
-        GuiHelper.fillGradientHorizontal(graphics, overItems, right - fade, this.getY(), right, bottom, transparent, this.background);
+        int transparent = ARGB.color(0, this.background);
+        GuiHelper.fillGradientHorizontal(graphics, this.getX(), this.getY(), this.getX() + fade, bottom, this.background, transparent);
+        GuiHelper.fillGradientHorizontal(graphics, right - fade, this.getY(), right, bottom, transparent, this.background);
 
         if (hovered != this.hoveredIndex) {
             this.hoveredIndex = hovered;
@@ -176,7 +172,7 @@ public class ItemCarouselWidget extends AbstractWidget {
         this.offset = moved < 0 ? moved + this.span : moved;
     }
 
-    /** Spinning the wheel over the strip flicks it along, decaying back to the idle pan. */
+    // spinning the wheel over the strip flicks it along, decaying back to the idle pan
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
         if (this.items.isEmpty()) return false;
@@ -185,7 +181,7 @@ public class ItemCarouselWidget extends AbstractWidget {
     }
 
     // AbstractWidget gates both of these on active, which is off here so clicks fall through. Scrolling still has to
-    // reach us though, and getChildAt only asks isMouseOver, so open that up and mute the click buttons instead.
+    // reach us though, and getChildAt only asks isMouseOver, so open that up and mute the click handlers instead
     @Override
     public boolean isMouseOver(double mouseX, double mouseY) {
         return this.visible && mouseX >= this.getX() && mouseY >= this.getY()
@@ -193,7 +189,7 @@ public class ItemCarouselWidget extends AbstractWidget {
     }
 
     @Override
-    protected boolean isValidClickButton(int button) {
+    protected boolean isValidClickButton(MouseButtonInfo buttonInfo) {
         return false;
     }
 

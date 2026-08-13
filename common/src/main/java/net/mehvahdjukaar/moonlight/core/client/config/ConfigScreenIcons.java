@@ -1,50 +1,35 @@
 package net.mehvahdjukaar.moonlight.core.client.config;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Axis;
+import net.mehvahdjukaar.moonlight.api.client.gui.AnimatedGuiItem;
 import net.mehvahdjukaar.moonlight.api.client.gui.ConfigScreenExtensions;
-import net.mehvahdjukaar.moonlight.api.client.util.RenderUtil;
-import net.minecraft.Util;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.client.resources.model.BakedModel;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
+import net.minecraft.util.Util;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import org.jetbrains.annotations.Nullable;
+import org.joml.Matrix4f;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
 
-/**
- * Client side resolver for the decorative icons attached to config rows via
- * {@link net.mehvahdjukaar.moonlight.api.platform.configs.ConfigBuilder#icon}. A config only ever stores an inert
- * icon id (a {@link ResourceLocation}); this turns that id into a rendered 16x16 item at screen render time, when
- * the item/block registries are populated. Resolution is memoized, so it's cheap to call every frame.
- * <p>
- * By default an id resolves to the matching item, else the matching block's item. Mods that need something a plain
- * lookup can't produce (a stack with data components, a made-up icon key, ...) register an override via
- * {@link ConfigScreenExtensions#registerIcon} from their client setup.
- */
+// Client side resolver for the decorative icons attached to config rows via
+// net.mehvahdjukaar.moonlight.api.platform.configs.ConfigBuilder.icon. A config only ever stores an inert icon id (a
+// Identifier); this turns that id into a rendered 16x16 item at screen render time, when the item/block registries are
+// populated. Resolution is memoized, so it's cheap to call every frame. By default an id resolves to the matching item,
+// else the matching block's item. Mods that need something a plain lookup can't produce (a stack with data components, a
+// made-up icon key, ...) register an override via ConfigScreenExtensions.registerIcon from their client setup.
 public final class ConfigScreenIcons {
 
-    private static final Map<ResourceLocation, ItemStack> CACHE = new HashMap<>();
+    private static final int ICON_SIZE = 16;
 
-    /** @deprecated use {@link ConfigScreenExtensions#registerIcon} instead. */
-    @Deprecated(forRemoval = true)
-    public static void registerOverride(ResourceLocation id, Supplier<ItemStack> stack) {
-        ConfigScreenExtensions.registerIcon(id, stack);
-        CACHE.remove(id);
-    }
+    private static final Map<Identifier, ItemStack> CACHE = new HashMap<>();
 
-    public static ItemStack resolve(@Nullable ResourceLocation id) {
+    public static ItemStack resolve(@Nullable Identifier id) {
         if (id == null) return ItemStack.EMPTY;
         ItemStack cached = CACHE.get(id);
         if (cached != null) return cached;
@@ -53,7 +38,7 @@ public final class ConfigScreenIcons {
         return resolved;
     }
 
-    private static ItemStack compute(ResourceLocation id) {
+    private static ItemStack compute(Identifier id) {
         Supplier<ItemStack> override = ConfigScreenExtensions.iconOverride(id);
         if (override != null) {
             ItemStack s = override.get();
@@ -71,43 +56,43 @@ public final class ConfigScreenIcons {
         return ItemStack.EMPTY;
     }
 
-    public static boolean has(@Nullable ResourceLocation id) {
+    public static boolean has(@Nullable Identifier id) {
         return id != null && !resolve(id).isEmpty();
     }
 
-    public static boolean render(GuiGraphics graphics, @Nullable ResourceLocation id, int x, int y) {
+    public static boolean render(GuiGraphicsExtractor graphics, @Nullable Identifier id, int x, int y) {
         ItemStack stack = resolve(id);
         if (stack.isEmpty()) return false;
-        graphics.renderItem(stack, x, y);
+        graphics.item(stack, x, y);
         return true;
     }
 
-    // ===== hover animation (ported from the old Configured screen) =====
+    // hover animation, ported from the old Configured screen
 
     private static final int PERIOD = 36; // phase wraps here: a full Y spin, or two pulse cycles
+    // GUI items have no world lightmap, so a low combinedLight only darkens when a level is loaded (the lightmap is
+    // white on the main menu). Tinting the blit instead reads the same in or out of a world.
+    private static final int DISABLED_TINT = 0xFF595959;
 
-    public static boolean renderAnimated(GuiGraphics graphics, @Nullable ResourceLocation id, int x, int y,
+    public static boolean renderAnimated(GuiGraphicsExtractor graphics, @Nullable Identifier id, int x, int y,
                                          float phase, boolean lit) {
         ItemStack stack = resolve(id);
         if (stack.isEmpty()) return false;
-        // GUI items have no world lightmap, so a low combinedLight only darkens when a level is loaded (the lightmap
-        // is white on the main menu). Dim through the shader colour modulator instead, which reads the same in or out
-        // of a world, so a disabled category's icon looks dark everywhere.
-        if (!lit) RenderSystem.setShaderColor(0.35f, 0.35f, 0.35f, 1f);
-        RenderUtil.renderGuiItemRelative(graphics.pose(), stack, x, y,
-                Minecraft.getInstance().getItemRenderer(),
-                (pose, model) -> animate(pose, model, phase), LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
-        if (!lit) RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+        if (phase <= 0 && lit) {
+            graphics.item(stack, x, y); // the cheap path: no transform, no tint, straight through the item atlas
+        } else {
+            AnimatedGuiItem.submit(graphics, stack, x, y, ICON_SIZE, lit ? -1 : DISABLED_TINT,
+                    (pose, blockModel) -> animate(pose, blockModel, phase));
+        }
         return true;
     }
 
-    private static void animate(PoseStack pose, BakedModel model, float phase) {
+    private static void animate(Matrix4f pose, boolean blockModel, float phase) {
         if (phase <= 0) return;
-        if (model.usesBlockLight()) {
-            pose.mulPose(Axis.YP.rotationDegrees(phase * 10f)); // 0..360 over a period -> continuous spin while hovered
+        if (blockModel) {
+            pose.rotateY(phase * 10f * Mth.DEG_TO_RAD); // 0..360 over a period -> continuous spin while hovered
         } else {
-            float scale = 1 + 0.1f * Mth.sin(phase * Mth.DEG_TO_RAD * 20f); // gentle throb for flat items
-            pose.scale(scale, scale, scale);
+            pose.scale(1 + 0.1f * Mth.sin(phase * Mth.DEG_TO_RAD * 20f)); // gentle throb for flat items
         }
     }
 

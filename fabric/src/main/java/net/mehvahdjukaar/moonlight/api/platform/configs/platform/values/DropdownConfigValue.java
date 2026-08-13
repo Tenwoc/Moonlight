@@ -12,7 +12,7 @@ import java.util.function.Supplier;
 
 /**
  * A string config value picked from a set of options (a plain list, or a registry). Stored like a
- * {@link StringConfigValue}; the distinct type carries the lazy option list and optional icon and tells the screen
+ * StringConfigValue; the distinct type carries the lazy option list and optional icon and tells the screen
  * to use the dropdown widget.
  */
 public class DropdownConfigValue extends StringConfigValue {

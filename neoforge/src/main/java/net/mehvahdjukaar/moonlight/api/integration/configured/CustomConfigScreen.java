@@ -33,7 +33,7 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -136,7 +136,7 @@ public abstract class CustomConfigScreen extends ConfigScreen {
         last = last.toLowerCase(Locale.ROOT).replace("_", " ");
         if (!icons.containsKey(last)) {
             String formatted = last.toLowerCase(Locale.ROOT).replace(" ", "_");
-            var item = BuiltInRegistries.ITEM.getOptional(ResourceLocation.fromNamespaceAndPath(modId, formatted));
+            var item = BuiltInRegistries.ITEM.getOptional(Identifier.fromNamespaceAndPath(modId, formatted));
             String finalLast = last;
             item.ifPresent(value -> addIcon(finalLast, value.asItem().getDefaultInstance()));
         }
@@ -439,7 +439,7 @@ public abstract class CustomConfigScreen extends ConfigScreen {
 
             boolean on = this.holder.get();
 
-            ResourceLocation iconRes = on ? CustomConfigSelectScreen.ON_ICON : CustomConfigSelectScreen.OFF_ICON;
+            Identifier iconRes = on ? CustomConfigSelectScreen.ON_ICON : CustomConfigSelectScreen.OFF_ICON;
 
             graphics.blitSprite(iconRes, iconX, iconY, ICON_SIZE, ICON_SIZE);
 
