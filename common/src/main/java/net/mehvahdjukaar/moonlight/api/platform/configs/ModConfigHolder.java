@@ -84,11 +84,6 @@ public abstract class ModConfigHolder {
         this.featureToggles = Map.copyOf(featureToggles);
     }
 
-    /**
-     * Whether the feature(...) toggle with the given name is on. Accepts either the short name or the full
-     * dotted path ("speaker_block" or "redstone.speaker_block"), and returns true for an unknown one
-     * so ungated content stays enabled. Composes ancestor gates, so it reads false when a parent feature is off.
-     */
     public boolean isFeatureEnabled(String nameOrPath) {
         Supplier<Boolean> toggle = this.featureToggles.get(nameOrPath);
         return toggle == null || Boolean.TRUE.equals(toggle.get());

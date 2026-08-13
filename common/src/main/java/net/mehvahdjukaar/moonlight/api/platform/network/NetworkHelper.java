@@ -27,18 +27,6 @@ public class NetworkHelper {
 
         <M extends Message> void registerClientBound(CustomPacketPayload.TypeAndCodec<RegistryFriendlyByteBuf, M> messageType);
 
-        /**
-         * Clientbound, but a connection is allowed to go without it. Use this for anything a mod can live
-         * without on one side, typically a client-side-only mod that merely works better with a server half:
-         * NeoForge otherwise denies any connection that is missing a registered payload, which would lock such
-         * a client out of every server that doesn't have the mod (vanilla ones included).
-         *
-         * <p>Two things follow from a payload being optional. It may be sent to players who can't receive it,
-         * so NetworkHelper.sendToClientPlayer quietly skips those; the broadcast helpers do not, and
-         * will throw on NeoForge, so send optional payloads per player. And the client can ask whether the
-         * server has the mod at all, through NetworkHelper.serverHasChannel, which only works for
-         * payloads registered here.
-         */
         <M extends Message> void registerClientBoundOptional(CustomPacketPayload.TypeAndCodec<RegistryFriendlyByteBuf, M> messageType);
 
         <M extends Message> void registerBidirectional(CustomPacketPayload.TypeAndCodec<RegistryFriendlyByteBuf, M> messageType);
@@ -65,13 +53,6 @@ public class NetworkHelper {
         throw new AssertionError();
     }
 
-    /**
-     * Client side: whether the server this client is connected to has the given channel, read off what the two
-     * sides agreed on when the connection was set up. This is the way for a client to tell that the server has
-     * a mod, and only answers for payloads registered with
-     * RegisterMessagesEvent.registerClientBoundOptional (a required one can't be missing, and a plain
-     * clientbound one isn't advertised in a direction Fabric lets clients see).
-     */
     @PlatformImpl
     public static boolean serverHasChannel(CustomPacketPayload.Type<?> type) {
         throw new AssertionError();
