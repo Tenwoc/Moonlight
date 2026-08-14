@@ -44,17 +44,17 @@ public abstract class ConfigOption<T> extends ConfigNode {
      * backing leaves.
      */
     public ConfigReloadType reloadType() {
-        return backingMeta()
+        return backingValues()
                 .map(IConfigValue::reloadType)
                 .max(Comparator.comparingInt(Enum::ordinal))
                 .orElse(ConfigReloadType.NONE);
     }
 
     /** The backing leaf value(s): one for a leaf row, several for a grouped one. */
-    protected abstract Stream<IConfigValue<?>> backingMeta();
+    protected abstract Stream<IConfigValue<?>> backingValues();
 
     // handles may be synthetic suppliers, so only the real leaves are kept
-    protected static Stream<IConfigValue<?>> metaOf(Supplier<?>... handles) {
+    protected static Stream<IConfigValue<?>> storedValuesOf(Supplier<?>... handles) {
         return Arrays.stream(handles)
                 .filter(h -> h instanceof IConfigValue)
                 .map(h -> (IConfigValue<?>) h);
@@ -70,11 +70,6 @@ public abstract class ConfigOption<T> extends ConfigNode {
     /** Writes the given (already validated) value back to the underlying config and saves it. */
     public abstract void apply(ModConfigHolder holder, Object value);
 
-    /**
-     * An option backed by a single writable leaf of the same type. Reading, writing and change metadata all go
-     * straight through the object define(...) returned (a ConfigValue on Fabric, a
-     * ValueWrapper on NeoForge).
-     */
     public abstract static class SimpleConfigOption<T> extends ConfigOption<T> {
 
         protected final IConfigValue<T> handle;
@@ -97,7 +92,7 @@ public abstract class ConfigOption<T> extends ConfigNode {
         }
 
         @Override
-        protected Stream<IConfigValue<?>> backingMeta() {
+        protected Stream<IConfigValue<?>> backingValues() {
             return Stream.of(this.handle);
         }
     }
@@ -276,8 +271,8 @@ public abstract class ConfigOption<T> extends ConfigNode {
         }
 
         @Override
-        protected Stream<IConfigValue<?>> backingMeta() {
-            return metaOf(minHandle, maxHandle);
+        protected Stream<IConfigValue<?>> backingValues() {
+            return storedValuesOf(minHandle, maxHandle);
         }
     }
 
@@ -313,8 +308,8 @@ public abstract class ConfigOption<T> extends ConfigNode {
         }
 
         @Override
-        protected Stream<IConfigValue<?>> backingMeta() {
-            return metaOf(xHandle, yHandle, zHandle);
+        protected Stream<IConfigValue<?>> backingValues() {
+            return storedValuesOf(xHandle, yHandle, zHandle);
         }
     }
 
@@ -350,8 +345,8 @@ public abstract class ConfigOption<T> extends ConfigNode {
         }
 
         @Override
-        protected Stream<IConfigValue<?>> backingMeta() {
-            return metaOf(xHandle, yHandle, zHandle);
+        protected Stream<IConfigValue<?>> backingValues() {
+            return storedValuesOf(xHandle, yHandle, zHandle);
         }
     }
 
@@ -417,8 +412,8 @@ public abstract class ConfigOption<T> extends ConfigNode {
         }
 
         @Override
-        protected Stream<IConfigValue<?>> backingMeta() {
-            return metaOf(json);
+        protected Stream<IConfigValue<?>> backingValues() {
+            return storedValuesOf(json);
         }
     }
 
@@ -460,7 +455,7 @@ public abstract class ConfigOption<T> extends ConfigNode {
         }
 
         @Override
-        protected Stream<IConfigValue<?>> backingMeta() {
+        protected Stream<IConfigValue<?>> backingValues() {
             return Stream.of(this.handle);
         }
     }
@@ -485,8 +480,8 @@ public abstract class ConfigOption<T> extends ConfigNode {
         }
 
         @Override
-        protected Stream<IConfigValue<?>> backingMeta() {
-            return metaOf(handle);
+        protected Stream<IConfigValue<?>> backingValues() {
+            return storedValuesOf(handle);
         }
     }
 }

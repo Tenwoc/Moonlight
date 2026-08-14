@@ -10,7 +10,7 @@ import java.util.function.Consumer;
  * A bound editing widget: the widget itself plus a delegate that pushes a value into it (used, for example, to
  * redisplay a default without going through user input). Produced by a config control provider.
  */
-public record ConfigVisuals<T>(AbstractWidget widget, Consumer<T> valueSetter) {
+public record ConfigControl<T>(AbstractWidget widget, Consumer<T> valueSetter) {
 
     /**
      * Pushes a value into the widget when T isn't known statically, as config rows hold these wildcarded.
@@ -23,11 +23,11 @@ public record ConfigVisuals<T>(AbstractWidget widget, Consumer<T> valueSetter) {
 
     @FunctionalInterface
     public interface Provider<O extends ConfigOption<?>> {
-        ConfigVisuals<?> create(O option, ConfigEditSession session, Runnable onChange);
+        ConfigControl<?> create(O option, ConfigEditSession session, Runnable onChange);
     }
 
     /** Registers the control provider used to edit a given kind of config option. */
-    public static <O extends ConfigOption<?>> void register(Class<O> type, ConfigVisuals.Provider<O> provider) {
+    public static <O extends ConfigOption<?>> void register(Class<O> type, ConfigControl.Provider<O> provider) {
         ConfigControllers.register(type, provider);
     }
 }

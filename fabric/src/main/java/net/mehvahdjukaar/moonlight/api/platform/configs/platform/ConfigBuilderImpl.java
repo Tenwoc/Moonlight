@@ -9,7 +9,6 @@ import net.mehvahdjukaar.moonlight.api.platform.configs.ConfigMetadata;
 import net.mehvahdjukaar.moonlight.api.platform.configs.ConfigType;
 import net.mehvahdjukaar.moonlight.api.platform.configs.options.ConfigOption;
 import net.mehvahdjukaar.moonlight.api.platform.configs.platform.values.*;
-import net.mehvahdjukaar.moonlight.api.resources.assets.LangBuilder;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
@@ -31,16 +30,15 @@ public class ConfigBuilderImpl extends ConfigBuilder {
         return new ConfigBuilderImpl(name, type);
     }
 
-    private final ConfigSubCategory mainCategory = new ConfigSubCategory(this.getName().getNamespace());
+    private final JsonConfigCategory mainCategory = new JsonConfigCategory(this.getName().getNamespace());
 
-    private final Deque<ConfigSubCategory> categoryStack = new ArrayDeque<>();
+    private final Deque<JsonConfigCategory> categoryStack = new ArrayDeque<>();
 
     public ConfigBuilderImpl(Identifier name, ConfigType type) {
         super(name, type);
         categoryStack.push(mainCategory);
     }
 
-    //doesn't load it immediately. happens after registration to mimic forge
     @Override
     @NotNull
     protected FabricConfigHolder buildHolder() {
@@ -66,11 +64,11 @@ public class ConfigBuilderImpl extends ConfigBuilder {
 
     @Override
     public ConfigBuilderImpl push(String translation) {
-        var cat = new ConfigSubCategory(translation);
+        var cat = new JsonConfigCategory(translation);
         Objects.requireNonNull(categoryStack.peek()).addEntry(cat);
         categoryStack.push(cat);
         // register a readable name for the category so the native config screen button isn't a raw key
-        translations.put(translationKey(""), LangBuilder.getReadableName(translation));
+        noteCategoryName(translation);
         uiPush(Component.translatable(translationKey("")));
         return this;
     }
@@ -95,7 +93,6 @@ public class ConfigBuilderImpl extends ConfigBuilder {
         doAddConfig(name, config, ConfigBuilderImpl::toOption);
     }
 
-    // with an explicit screen-row factory, for values wanting a richer row than the default toOption mapping
     private void doAddConfig(String name, ConfigValue<?> config, Function<ConfigValue<?>, ConfigOption<?>> optionFactory) {
         config.setTranslationKey(this.translationKey(name));
         addTranslationsAndComments(name);

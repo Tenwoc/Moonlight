@@ -76,7 +76,7 @@ public class ModsTilesScreen extends Screen {
     public static Set<String> collectConfigurableMods() {
         // distinct mod ids that registered a config
         Set<String> modIds = new LinkedHashSet<>();
-        for (ModConfigHolder h : ModConfigHolder.getTrackedSpecs()) modIds.add(h.getModId());
+        for (ModConfigHolder h : ModConfigHolder.getTrackedHolders()) modIds.add(h.getModId());
         // extra mods (and, if enabled, every installed mod) that expose a loader/Mod Menu config screen
         for (String modId : EXTRA_MODS) {
             if (ClientHelper.hasModConfigScreen(modId)) modIds.add(modId);

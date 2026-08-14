@@ -1,6 +1,6 @@
 package net.mehvahdjukaar.moonlight.core.client.config;
 
-import net.mehvahdjukaar.moonlight.api.client.gui.ConfigVisuals;
+import net.mehvahdjukaar.moonlight.api.client.gui.ConfigControl;
 import net.mehvahdjukaar.moonlight.api.client.gui.ConfigEditSession;
 import net.mehvahdjukaar.moonlight.api.client.gui.misc.RegexHighlighter;
 import net.mehvahdjukaar.moonlight.api.client.gui.screen.ColorPickerScreen;
@@ -28,20 +28,20 @@ import java.util.function.Function;
 import static net.mehvahdjukaar.moonlight.core.client.config.ConfigScreenLayout.*;
 import static net.mehvahdjukaar.moonlight.api.client.gui.misc.ConfigGuiColors.*;
 
-// Client side registry turning a server safe ConfigOption into an editing ConfigVisuals. The one place that knows
+// Client side registry turning a server safe ConfigOption into an editing ConfigControl. The one place that knows
 // about widgets: the screen just asks create() and never branches on value type, so a new control means registering a
 // provider here (or, for add-ons, register() from their own client init) rather than touching the screen.
 public final class ConfigControllers {
 
-    private static final Map<Class<?>, ConfigVisuals. Provider<?>> PROVIDERS = new HashMap<>();
+    private static final Map<Class<?>, ConfigControl.Provider<?>> PROVIDERS = new HashMap<>();
 
-    public static <O extends ConfigOption<?>> void register(Class<O> type, ConfigVisuals.Provider<O> provider) {
+    public static <O extends ConfigOption<?>> void register(Class<O> type, ConfigControl.Provider<O> provider) {
         PROVIDERS.put(type, provider);
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    public static ConfigVisuals<?> create(ConfigOption<?> option, ConfigEditSession session, Runnable onChange) {
-        ConfigVisuals. Provider provider = PROVIDERS.get(option.getClass());
+    public static ConfigControl<?> create(ConfigOption<?> option, ConfigEditSession session, Runnable onChange) {
+        ConfigControl.Provider provider = PROVIDERS.get(option.getClass());
         if (provider == null) return disabled();
         return provider.create(option, session, onChange);
     }
@@ -56,7 +56,7 @@ public final class ConfigControllers {
                         s.put(o, val);
                         onChange.run();
                     });
-            return new ConfigVisuals<>(w, w::setValue);
+            return new ConfigControl<>(w, w::setValue);
         });
 
         @SuppressWarnings("unchecked")
@@ -72,7 +72,7 @@ public final class ConfigControllers {
                 }));
 
         register(ConfigOption.RegexValue.class, (o, s, onChange) -> {
-            ConfigVisuals<Object> control = textField(s.current(o), String::valueOf, str -> {
+            ConfigControl<Object> control = textField(s.current(o), String::valueOf, str -> {
                 if (!o.isValid(str)) throw new IllegalArgumentException();
                 s.put(o, str);
                 onChange.run();
@@ -94,7 +94,7 @@ public final class ConfigControllers {
                                 s.put(o, picked);
                                 onChange.run();
                             })));
-            return new ConfigVisuals<Integer>(w, w::setColor);
+            return new ConfigControl<Integer>(w, w::setColor);
         });
 
         // plain numbers -> stepper field, slider subtypes -> slider. The value's own class is the signal
@@ -131,7 +131,7 @@ public final class ConfigControllers {
                 s.put(o, r);
                 onChange.run();
             });
-            return new ConfigVisuals<>(w, w::setRange);
+            return new ConfigControl<>(w, w::setRange);
         });
 
         register(ConfigOption.Vec3Value.class, (o, s, onChange) -> {
@@ -141,7 +141,7 @@ public final class ConfigControllers {
                         s.put(o, new Vec3(x, y, z));
                         onChange.run();
                     });
-            return new ConfigVisuals<Vec3>(w, vv -> w.setValues(vv.x, vv.y, vv.z));
+            return new ConfigControl<Vec3>(w, vv -> w.setValues(vv.x, vv.y, vv.z));
         });
 
         register(ConfigOption.Vec3iValue.class, (o, s, onChange) -> {
@@ -151,7 +151,7 @@ public final class ConfigControllers {
                         s.put(o, new Vec3i((int) Math.round(x), (int) Math.round(y), (int) Math.round(z)));
                         onChange.run();
                     });
-            return new ConfigVisuals<Vec3i>(w, vv -> w.setValues(vv.getX(), vv.getY(), vv.getZ()));
+            return new ConfigControl<Vec3i>(w, vv -> w.setValues(vv.getX(), vv.getY(), vv.getZ()));
         });
 
         register(ConfigOption.DropdownValue.class, (o, s, onChange) -> {
@@ -159,7 +159,7 @@ public final class ConfigControllers {
                 s.put(o, val);
                 onChange.run();
             });
-            return new ConfigVisuals<>(w, w::setValue);
+            return new ConfigControl<>(w, w::setValue);
         });
 
         register(ConfigOption.ListValue.class, (o, s, onChange) -> {
@@ -168,7 +168,7 @@ public final class ConfigControllers {
                         s.put(o, edited);
                         onChange.run();
                     })));
-            return new ConfigVisuals<List<String>>(button, list -> button.setMessage(listLabel(list)));
+            return new ConfigControl<List<String>>(button, list -> button.setMessage(listLabel(list)));
         });
 
         register(ConfigOption.JsonValue.class, (o, s, onChange) -> {
@@ -178,7 +178,7 @@ public final class ConfigControllers {
                         s.put(o, edited);
                         onChange.run();
                     })));
-            return new ConfigVisuals<Object>(button, v -> {
+            return new ConfigControl<Object>(button, v -> {
             });
         });
 
@@ -190,7 +190,7 @@ public final class ConfigControllers {
             Button button = new IconButton(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT,
                     Component.translatable("gui.moonlight.config.edit"), EDIT_ICON, 12, 12, b ->
                     Minecraft.getInstance().setScreen(SchemaEditScreen.create(o, s, onChange)));
-            return new ConfigVisuals<>(button, v -> {
+            return new ConfigControl<>(button, v -> {
             });
         });
 
@@ -200,7 +200,7 @@ public final class ConfigControllers {
 
     // A category's feature() gate shown as a row inside its own category: like the plain boolean control but drawing
     // check/cross sprites, matching the inline toggle the parent screen shows next to the category button
-    static ConfigVisuals<Boolean> featureToggle(ConfigOption.BooleanValue o, ConfigEditSession s, Runnable onChange) {
+    static ConfigControl<Boolean> featureToggle(ConfigOption.BooleanValue o, ConfigEditSession s, Runnable onChange) {
         Identifier icon = o.icon();
         // draw the feature's decorative item just left of the check/cross symbol, when it resolves to something
         BooleanToggleWidget.ExtraIcon iconRenderer = icon == null ? null : new BooleanToggleWidget.ExtraIcon() {
@@ -222,10 +222,10 @@ public final class ConfigControllers {
             s.put(o, val);
             onChange.run();
         }, iconRenderer);
-        return new ConfigVisuals<Boolean>(w, w::set);
+        return new ConfigControl<Boolean>(w, w::set);
     }
 
-    private static <E extends Enum<E>> ConfigVisuals<E> enumControl(ConfigOption.EnumValue<E> o, ConfigEditSession s, Runnable onChange) {
+    private static <E extends Enum<E>> ConfigControl<E> enumControl(ConfigOption.EnumValue<E> o, ConfigEditSession s, Runnable onChange) {
         CycleButton<E> w = CycleButton.<E>builder(x -> Component.literal(x.name()), s.current(o))
                 .withValues(o.options)
                 .displayOnlyValue()
@@ -233,31 +233,31 @@ public final class ConfigControllers {
                     s.put(o, val);
                     onChange.run();
                 });
-        return new ConfigVisuals<E>(w, w::setValue);
+        return new ConfigControl<E>(w, w::setValue);
     }
 
-    private static ConfigVisuals<Number> slider(double min, double max, double current, boolean integer,
+    private static ConfigControl<Number> slider(double min, double max, double current, boolean integer,
                                                 Consumer<Double> store, Runnable onChange) {
         return slider(min, max, current, integer, false, store, onChange);
     }
 
-    private static ConfigVisuals<Number> slider(double min, double max, double current, boolean integer, boolean percent,
+    private static ConfigControl<Number> slider(double min, double max, double current, boolean integer, boolean percent,
                                                 Consumer<Double> store, Runnable onChange) {
         RangedSlider slider = new RangedSlider(CONTROL_WIDTH, CONTROL_HEIGHT, min, max, current, integer, percent, v -> {
             store.accept(v);
             onChange.run();
         });
-        return new ConfigVisuals<>(slider, n -> slider.setActualValue(n.doubleValue()));
+        return new ConfigControl<>(slider, n -> slider.setActualValue(n.doubleValue()));
     }
 
-    private static ConfigVisuals<Number> numberField(Number initial, double min, double max, boolean integer,
+    private static ConfigControl<Number> numberField(Number initial, double min, double max, boolean integer,
                                                      DoubleConsumer store) {
         NumberFieldWidget w = new NumberFieldWidget(CONTROL_WIDTH, CONTROL_HEIGHT, initial.doubleValue(),
                 min, max, integer, store);
-        return new ConfigVisuals<>(w, n -> w.setValue(n.doubleValue()));
+        return new ConfigControl<>(w, n -> w.setValue(n.doubleValue()));
     }
 
-    private static ConfigVisuals<Object> textField(String initial, Function<Object, String> display, TextCommit commit) {
+    private static ConfigControl<Object> textField(String initial, Function<Object, String> display, TextCommit commit) {
         EditBox box = new PanningEditBox(Minecraft.getInstance().font, 0, 0, CONTROL_WIDTH, CONTROL_HEIGHT, Component.empty());
         box.setMaxLength(Short.MAX_VALUE);
         box.setValue(initial);
@@ -269,18 +269,18 @@ public final class ConfigControllers {
                 box.setTextColor(ERROR);
             }
         });
-        return new ConfigVisuals<Object>(box, v -> box.setValue(display.apply(v)));
+        return new ConfigControl<Object>(box, v -> box.setValue(display.apply(v)));
     }
 
     private static Component listLabel(List<String> list) {
         return Component.translatable("gui.moonlight.config.list_entries", list.size());
     }
 
-    private static ConfigVisuals<Object> disabled() {
+    private static ConfigControl<Object> disabled() {
         Button button = Button.builder(Component.translatable("gui.moonlight.config.edit_manually"), b -> {
         }).bounds(0, 0, CONTROL_WIDTH, CONTROL_HEIGHT).build();
         button.active = false;
-        return new ConfigVisuals<>(button, v -> {
+        return new ConfigControl<>(button, v -> {
         });
     }
 

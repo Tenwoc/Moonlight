@@ -8,24 +8,17 @@ import com.mojang.serialization.JsonOps;
 import net.mehvahdjukaar.codecui.SchemaCodec;
 import net.mehvahdjukaar.moonlight.api.client.gui.ConfigEditSession;
 import net.mehvahdjukaar.moonlight.api.client.gui.GuiHelper;
-import net.mehvahdjukaar.moonlight.api.client.gui.OverlayLayer;
-import net.mehvahdjukaar.moonlight.api.client.gui.PopupHost;
 import net.mehvahdjukaar.moonlight.api.client.gui.misc.ConfigGuiColors;
 import net.mehvahdjukaar.moonlight.api.platform.configs.options.ConfigCategory;
 import net.mehvahdjukaar.moonlight.api.platform.configs.options.ConfigNode;
 import net.mehvahdjukaar.moonlight.api.platform.configs.options.ConfigOption;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.FormattedCharSequence;
-import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.input.CharacterEvent;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -41,7 +34,7 @@ import static net.mehvahdjukaar.moonlight.core.client.config.ConfigScreenLayout.
 // Working edits live in a private holder-less ConfigEditSession shared across the sub-category navigation stack;
 // nothing here writes to disk. Only the root page commits: on Done the form's JSON is reassembled from the session,
 // decoded through the codec and, if valid, handed back to the outer config screen. Sub-record pages just navigate.
-public class SchemaEditScreen extends Screen implements ConfigScreenAccess, PopupHost {
+public class SchemaEditScreen extends ConfigPageScreen {
 
     // shared across the whole sub-category navigation stack of one editing visit
     private record State(ConfigEditSession session, SchemaForm.Reader reader, Codec<?> codec, Consumer<Object> onDone) {}
@@ -50,9 +43,7 @@ public class SchemaEditScreen extends Screen implements ConfigScreenAccess, Popu
     private final ConfigCategory category;
     @Nullable
     private final SchemaEditScreen parentPage; // null = root page (the one that commits)
-    private final OverlayLayer overlay = new OverlayLayer();
 
-    private ConfigOptionList list;
     @Nullable
     private Button addButton; // list pages only; kept to re-evaluate its enabled state after an entry is added
     @Nullable
@@ -75,7 +66,7 @@ public class SchemaEditScreen extends Screen implements ConfigScreenAccess, Popu
             outerSession.put(option, decoded);
             onChange.run();
         };
-        State state = new State(new ConfigEditSession(null, parent), form.reader, codec, onDone);
+        State state = new State(ConfigEditSession.scratch(parent), form.reader, codec, onDone);
         return new SchemaEditScreen(form.root, null, state, option.title());
     }
 
@@ -96,11 +87,6 @@ public class SchemaEditScreen extends Screen implements ConfigScreenAccess, Popu
     }
 
     @Override
-    public Font font() {
-        return this.font;
-    }
-
-    @Override
     public ConfigEditSession session() {
         return this.state.session;
     }
@@ -111,27 +97,8 @@ public class SchemaEditScreen extends Screen implements ConfigScreenAccess, Popu
     }
 
     @Override
-    public void toggleExpanded(ConfigOption<?> value) {
-        state.session.toggleExpanded(value);
-        populate();
-    }
-
-    @Override
     public void onValueEdited() {
         this.error = null; // a fresh edit may well have fixed whatever was invalid; re-checked on Done
-    }
-
-    @Override
-    public boolean isCategoryEnabled(ConfigCategory cat) {
-        ConfigOption.BooleanValue gate = cat.gate();
-        boolean own = gate == null || Boolean.TRUE.equals(state.session.current(gate));
-        ConfigCategory parent = cat.parent();
-        return own && (parent == null || isCategoryEnabled(parent));
-    }
-
-    @Override
-    public OverlayLayer getOverlayLayer() {
-        return this.overlay;
     }
 
     @Override
@@ -141,7 +108,7 @@ public class SchemaEditScreen extends Screen implements ConfigScreenAccess, Popu
         // a list page needs a second button row for "add entry". +24 keeps the gap between the list and the topmost
         // button at the usual 8px
         int footer = listCategory != null ? FOOTER + 24 : FOOTER;
-        this.list = new ConfigOptionList(this.minecraft, this.width, this.height - HEADER - footer, HEADER, ITEM_HEIGHT);
+        this.list = new ConfigRowList(this.minecraft, this.width, this.height - HEADER - footer, HEADER, ITEM_HEIGHT);
         populate();
         this.addRenderableWidget(this.list);
 
@@ -171,7 +138,8 @@ public class SchemaEditScreen extends Screen implements ConfigScreenAccess, Popu
         return category instanceof SchemaForm.ListCategory lc ? lc : null;
     }
 
-    private void populate() {
+    @Override
+    protected void populate() {
         SchemaForm.ListCategory listCategory = listCategory();
         List<ConfigListRow> rows = new ArrayList<>();
         List<ConfigNode> entries = category.entries();
@@ -191,12 +159,7 @@ public class SchemaEditScreen extends Screen implements ConfigScreenAccess, Popu
                 continue; // generated list entries never carry a description, so there is nothing to expand
             }
             rows.add(row);
-            if (e instanceof ConfigOption<?> v && v.description() != null && state.session.isExpanded(v)) {
-                List<FormattedCharSequence> lines = this.font.split(v.description(), ROW_WIDTH - ARROW_WIDTH - GAP);
-                for (int j = 0; j < lines.size(); j += DESC_LINES_PER_ROW) {
-                    rows.add(new DescriptionRow(this.font, lines.subList(j, Math.min(j + DESC_LINES_PER_ROW, lines.size()))));
-                }
-            }
+            if (e instanceof ConfigOption<?> v) addDescriptionRows(rows, v);
         }
         this.list.setRows(rows);
     }
@@ -247,28 +210,6 @@ public class SchemaEditScreen extends Screen implements ConfigScreenAccess, Popu
     }
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        double mouseX = event.x(), mouseY = event.y();
-        int button = event.button();
-        return overlay.mouseClicked(event, doubleClick) || super.mouseClicked(event, doubleClick);
-    }
-
-    @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        return overlay.mouseScrolled(mouseX, mouseY, scrollY) || super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
-    }
-
-    @Override
-    public boolean keyPressed(KeyEvent event) {
-        return overlay.keyPressed(event) || super.keyPressed(event);
-    }
-
-    @Override
-    public boolean charTyped(CharacterEvent event) {
-        return overlay.charTyped(event) || super.charTyped(event);
-    }
-
-    @Override
     public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         super.extractBackground(graphics, mouseX, mouseY, partialTick);
         GuiHelper.renderHeaderBar(graphics, this.font, this.title, this.width, HEADER);
@@ -277,21 +218,7 @@ public class SchemaEditScreen extends Screen implements ConfigScreenAccess, Popu
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
-        if (overlay.isOpen()) {
-            overlay.render(graphics, mouseX, mouseY);
-            return;
-        }
-        ConfigListRow hovered = this.list.getHovered(mouseX, mouseY);
-        Component tooltip = hovered != null ? hovered.getTooltip(mouseX, mouseY) : null;
-        if (tooltip == null) {
-            for (ConfigListRow row : this.list.children()) {
-                tooltip = row.getGutterTooltip(mouseX, mouseY);
-                if (tooltip != null) break;
-            }
-        }
-        if (tooltip != null) {
-            graphics.setTooltipForNextFrame(this.font, this.font.split(tooltip, 220), mouseX, mouseY);
-        }
+        if (renderOverlayOrTooltip(graphics, mouseX, mouseY)) return;
         if (this.error != null) {
             // sits just above the button strip, which is one row taller on a list page (the "add entry" button)
             int y = this.height - (listCategory() != null ? 66 : 42);
