@@ -9,6 +9,7 @@ import net.mehvahdjukaar.moonlight.api.client.gui.IItemDecoratorRenderer;
 import net.mehvahdjukaar.moonlight.api.resources.assets.LangBuilder;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.mehvahdjukaar.moonlight.core.client.config.MoonlightConfigSelectScreen;
 import net.minecraft.client.color.block.BlockTintSource;
 import net.minecraft.client.gui.render.pip.PictureInPictureRenderer;
 import net.minecraft.client.gui.screens.MenuScreens;
@@ -303,6 +304,11 @@ public class ClientHelper {
     @PlatformImpl
     public static Path getModIcon(String modId) {
         throw new AssertionError();
+    }
+
+    @Nullable
+    public static Screen getMoonlightConfigScreen(String modId, Screen parent, @Nullable Identifier background) {
+        return MoonlightConfigSelectScreen.create(modId, parent, background);
     }
 
     /**
