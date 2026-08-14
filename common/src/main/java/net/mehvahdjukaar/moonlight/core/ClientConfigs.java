@@ -41,7 +41,7 @@ public class ClientConfigs {
         TAGS_TOOLTIP = builder.comment("Show Item and Block tags on item tooltip")
                 .define("tags_tooltips", PlatHelper.isDev() ? TooltipMode.ON : TooltipMode.OFF);
 
-        CUSTOM_CONFIG_SCREEN = builder.comment("Use Moonlight's own custom config screen. When disabled, config screens are left to the loader instead: on NeoForge that means NeoForge's own screen (or Configured, if installed), and on Fabric the old Cloth Config / YACL screens")
+        CUSTOM_CONFIG_SCREEN = builder.comment("Use Moonlight's own custom config screen. When disabled, config screens are left to the loader instead: on NeoForge that means NeoForge's own screen (or Configured, if installed). Fabric has no such screen, so there configs simply can't be edited in game")
                 .define("custom_config_screen", true);
         SHOW_ALL_MOD_CONFIGS = builder.comment("Show a config tile for every installed mod that exposes a config screen, not just the ones using Moonlight's config system. Clicking one opens the screen the mod itself registered (NeoForge's screen extension, or Mod Menu on Fabric)")
                 .define("show_all_mod_configs", false);

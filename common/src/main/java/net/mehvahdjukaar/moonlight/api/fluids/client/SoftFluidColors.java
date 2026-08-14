@@ -1,6 +1,5 @@
 package net.mehvahdjukaar.moonlight.api.fluids.client;
 
-import net.mehvahdjukaar.candlelight.api.PlatformImpl;
 import net.mehvahdjukaar.moonlight.api.client.TextureCache;
 import net.mehvahdjukaar.moonlight.api.client.texture_renderer.DynamicTextureRenderer;
 import net.mehvahdjukaar.moonlight.api.fluids.SoftFluid;
@@ -11,18 +10,29 @@ import net.mehvahdjukaar.moonlight.api.platform.ClientHelper;
 import net.mehvahdjukaar.moonlight.api.resources.textures.PalettedPermutationsHelper;
 import net.mehvahdjukaar.moonlight.core.Moonlight;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.color.block.BlockTintSource;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.block.BlockAndTintGetter;
+import net.minecraft.client.renderer.block.FluidModel;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.data.AtlasIds;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
 import net.minecraft.util.ARGB;
+import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.item.alchemy.PotionContents;
+import net.minecraft.world.item.component.DyedItemColor;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.material.Fluids;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -55,8 +65,16 @@ public class SoftFluidColors implements ResourceManagerReloadListener {
         refreshParticleColors(SoftFluidRegistry.get(registryAccess));
     }
 
+    /**
+     * Copies textures and tint off the fluid a soft fluid points its use_texture_from at, and averages its still
+     * texture for the particle color. Both have to happen here rather than in the SoftFluid constructor: fluid models
+     * are baked on a resource reload while soft fluids are built on a datapack one, so at construction time the model
+     * either doesn't exist yet or belongs to the previous pack.
+     */
     public static void refreshParticleColors(Registry<SoftFluid> reg) {
         for (var fluid : reg) {
+            fluid.setResolvedAppearance(resolveAppearance(fluid.getTextureOverride()));
+
             Identifier location = fluid.getStillTexture();
             int averageColor = -1;
 
@@ -116,9 +134,47 @@ public class SoftFluidColors implements ResourceManagerReloadListener {
                 totalB / total * tintB / 255);
     }
 
-    @PlatformImpl
-    public static int getSpecialColor(SoftFluidStack softFluidStack, BlockAndTintGetter world, BlockPos pos) {
-        throw new AssertionError();
+    @Nullable
+    private static SoftFluid.Appearance resolveAppearance(@Nullable Identifier useTexturesFrom) {
+        if (useTexturesFrom == null) return null;
+        Fluid fluid = BuiltInRegistries.FLUID.getValue(useTexturesFrom);
+        if (fluid == null || fluid == Fluids.EMPTY) return null;
+        FluidState state = fluid.defaultFluidState();
+        FluidModel model = Minecraft.getInstance().getModelManager().getFluidStateModelSet().get(state);
+        BlockTintSource tint = model.tintSource();
+        return new SoftFluid.Appearance(
+                model.stillMaterial().sprite().contents().name(),
+                model.flowingMaterial().sprite().contents().name(),
+                tint == null ? -1 : tint.color(state.createLegacyBlock()));
+    }
+
+    /**
+     * World and stack dependent tint of the vanilla fluid a soft fluid stack maps onto, which beats the fluid's own
+     * flat tint color. 0 when there is nothing better than that flat color to show.
+     */
+    public static int getSpecialColor(SoftFluidStack stack, @Nullable BlockAndTintGetter world, @Nullable BlockPos pos) {
+        //yay hardcoding
+        DyedItemColor dyeColor = stack.get(DataComponents.DYED_COLOR);
+        if (dyeColor != null) return dyeColor.rgb();
+
+        PotionContents potionContents = stack.get(DataComponents.POTION_CONTENTS);
+        if (potionContents != null) return potionContents.getColor();
+
+        DyeColor discreteDyeColor = stack.get(DataComponents.BASE_COLOR);
+        if (discreteDyeColor != null) return discreteDyeColor.getTextureDiffuseColor();
+
+        //at least this works for any fluid
+        Fluid fluid = stack.getVanillaFluid().value();
+        if (fluid == Fluids.EMPTY) return 0;
+        FluidState fluidState = fluid.defaultFluidState();
+        BlockTintSource tint = Minecraft.getInstance().getModelManager()
+                .getFluidStateModelSet().get(fluidState).tintSource();
+        if (tint == null) return 0;
+        BlockState blockState = fluidState.createLegacyBlock();
+        int color = world != null && pos != null
+                ? tint.colorInWorld(blockState, world, pos)
+                : tint.color(blockState);
+        return color == -1 ? 0 : color;
     }
 
     /**

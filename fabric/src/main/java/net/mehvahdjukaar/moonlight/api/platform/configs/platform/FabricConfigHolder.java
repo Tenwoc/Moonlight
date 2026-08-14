@@ -9,15 +9,12 @@ import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
-import net.mehvahdjukaar.moonlight.api.integration.cloth_config.ClothConfigCompat;
-import net.mehvahdjukaar.moonlight.api.integration.yacl.YACLCompat;
 import net.mehvahdjukaar.moonlight.api.misc.EventCalled;
 import net.mehvahdjukaar.moonlight.api.platform.configs.ConfigType;
 import net.mehvahdjukaar.moonlight.api.platform.configs.ModConfigHolder;
 import net.mehvahdjukaar.moonlight.api.platform.configs.options.ConfigCategory;
 import net.mehvahdjukaar.moonlight.api.resources.pack.GlobalCachedStrategy;
 import net.mehvahdjukaar.moonlight.core.ClientConfigs;
-import net.mehvahdjukaar.moonlight.core.CompatHandler;
 import net.mehvahdjukaar.moonlight.core.Moonlight;
 import net.mehvahdjukaar.moonlight.core.client.config.MoonlightConfigScreen;
 import net.minecraft.client.gui.screens.Screen;
@@ -130,17 +127,10 @@ public final class FabricConfigHolder extends ModConfigHolder {
     @Override
     @Environment(value = EnvType.CLIENT)
     public Screen makeScreen(Screen parent, Identifier background) {
-        if (ClientConfigs.CUSTOM_CONFIG_SCREEN.get()) {
-            ConfigCategory root = getConfigRoot();
-            return root == null ? null : MoonlightConfigScreen.create(this, root, parent, background);
-        }
-        // custom screen disabled: fall back to the old Cloth Config / YACL screens if those mods are present
-        if (CompatHandler.YACL) {
-            return YACLCompat.makeScreen(parent, this, background);
-        } else if (CompatHandler.CLOTH_CONFIG) {
-            return ClothConfigCompat.makeScreen(parent, this, background);
-        }
-        return null;
+        // fabric has no loader-side config screen to fall back on, so a disabled custom screen means no screen
+        if (!ClientConfigs.CUSTOM_CONFIG_SCREEN.get()) return null;
+        ConfigCategory root = getConfigRoot();
+        return root == null ? null : MoonlightConfigScreen.create(this, root, parent, background);
     }
 
     @Override

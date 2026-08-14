@@ -7,7 +7,7 @@ fabric {
     accessWidener(project(":common"))
 }
 
-val cloth_version: String by extra
+val modmenu_version: String by extra
 val cca_version: String by extra
 val codecui_version: String by extra
 dependencies {
@@ -21,9 +21,7 @@ dependencies {
     modCompileOnly("curse.maven:modernfix-790626:4599353")
     modCompileOnly("curse.maven:quark-243121:7640331")
 
-    modCompileOnly("me.shedaniel.cloth:cloth-config-fabric:${cloth_version}")
-    modCompileOnly("curse.maven:yacl-667299:5424169")
-    modImplementation("curse.maven:modmenu-308702:7808443")
+    modImplementation("com.terraformersmc:modmenu:${modmenu_version}")
     //modCompileOnly("curse.maven:super-better-grass-911433:4744836")
     modCompileOnly("curse.maven:map-atlases-436298:6345966")
     //modImplementation ("curse.maven:supplementaries-412082:4987505")
