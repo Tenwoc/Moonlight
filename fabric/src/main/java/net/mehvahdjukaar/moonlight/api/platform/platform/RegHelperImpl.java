@@ -153,11 +153,12 @@ public class RegHelperImpl {
                 PoiTypes.registerBlockStates(holder, holder.value().matchingStates());
             });
         }
-        return (RegSupplier<E>) registry.add((Supplier<T>) supplier, name);
+        return (RegSupplier<E>) registry.add((Supplier<T>) supplier::get, name);
     }
 
     public static <T, E extends T> RegSupplier<E> registerAsync(Identifier name, Supplier<E> supplier, ResourceKey<?  extends Registry<T>> reg) {
-        RegistryQueue.RegEntryHolder<T> entry = new RegistryQueue.RegEntryHolder<>(name, supplier,(ResourceKey) reg);
+        RegistryQueue.RegEntryHolder<T> entry = new RegistryQueue.RegEntryHolder<>(name,
+                supplier::get, (ResourceKey) reg);
         entry.initialize(true);
         return (RegSupplier<E>) entry;
     }

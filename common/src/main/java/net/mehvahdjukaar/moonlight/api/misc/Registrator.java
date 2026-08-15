@@ -1,6 +1,12 @@
 package net.mehvahdjukaar.moonlight.api.misc;
 
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.state.BlockBehaviour;
+
+import java.util.function.Function;
 
 @FunctionalInterface
 public interface Registrator<T> {
@@ -11,4 +17,20 @@ public interface Registrator<T> {
         register(Identifier.parse(name), instance);
     }
 
+    /**
+     * Blocks need their key before they are created, so give a factory and the properties it will get
+     */
+    default void registerBlock(Identifier name, Function<BlockBehaviour.Properties, ? extends T> factory,
+                               BlockBehaviour.Properties properties) {
+        register(name, factory.apply(properties.setId(ResourceKey.create(Registries.BLOCK, name))));
+    }
+
+    default void registerItem(Identifier name, Function<Item.Properties, ? extends T> factory,
+                              Item.Properties properties) {
+        register(name, factory.apply(properties.setId(ResourceKey.create(Registries.ITEM, name))));
+    }
+
+    default void registerItem(Identifier name, Function<Item.Properties, ? extends T> factory) {
+        registerItem(name, factory, new Item.Properties());
+    }
 }

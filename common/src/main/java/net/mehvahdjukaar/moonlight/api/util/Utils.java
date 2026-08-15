@@ -206,8 +206,15 @@ public class Utils {
         return object.unwrapKey().orElseThrow().identifier();
     }
 
+    /**
+     * For anything that carries its type holder, like BlockState, ItemStack, Entity, BlockEntity or FluidState
+     */
+    public static Identifier getID(@NotNull TypedInstance<?> object) {
+        return getId(object.typeHolder());
+    }
+
     public static Identifier getID(@NotNull Block object) {
-        return BuiltInRegistries.BLOCK.getKey(object);
+        return object.properties().id.identifier();
     }
 
     public static Identifier getID(@NotNull EntityType<?> object) {
@@ -226,8 +233,9 @@ public class Utils {
         return hackyGetRegistry(Registries.CONFIGURED_FEATURE).getKey(object);
     }
 
+    //items don't keep their properties around, but the holder they make at construction has the key
     public static Identifier getID(@NotNull Item object) {
-        return BuiltInRegistries.ITEM.getKey(object);
+        return object.builtInRegistryHolder().key().identifier();
     }
 
     public static Identifier getID(@NotNull Fluid object) {
@@ -277,6 +285,7 @@ public class Utils {
             case DamageType t -> getID(t);
             case StatType<?> t -> getID(t);
             case Holder<?> h -> getId(h);
+            case TypedInstance<?> t -> getID(t);
             default -> throw new UnsupportedOperationException("Unsupported class type " +
                     object.getClass() + ". Expected a registry entry for a call to Utils.getID()");
         };

@@ -17,6 +17,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Rarity;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.levelgen.placement.PlacementModifierType;
 import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceType;
 import net.minecraft.world.level.levelgen.structure.pools.StructurePoolElementType;
@@ -39,8 +40,7 @@ public class MoonlightRegistry {
             res("height_range_filter"), HeightRangeFilter.CODEC);
 
     public static final Supplier<BlockPlacerItem> BLOCK_PLACER = RegHelper.registerItem(
-            res("placeable_item"), () -> new BlockPlacerItem(
-                    Blocks.VOID_AIR, new Item.Properties()));
+            res("placeable_item"), p -> new BlockPlacerItem(Blocks.VOID_AIR, p));
 
     public static final Supplier<MapCodec<OptionalItemPoolEntry>> LAZY_ITEM = RegHelper.registerLootPoolEntry(
             res("optional_item"), () -> OptionalItemPoolEntry.CODEC);
@@ -62,11 +62,12 @@ public class MoonlightRegistry {
 
 
     public static final Supplier<SpawnBoxBlock> SPAWN_BOX_BLOCK = RegHelper.registerBlock(
-            Moonlight.res("spawn_box"), SpawnBoxBlock::new);
+            Moonlight.res("spawn_box"), SpawnBoxBlock::new,
+            BlockBehaviour.Properties.ofFullCopy(Blocks.JIGSAW));
 
     public static final Supplier<Item> STRUCTURE_BLOCK = RegHelper.registerItem(
-            Moonlight.res("spawn_box"), () -> new GameMasterBlockItem(
-                    SPAWN_BOX_BLOCK.get(), new Item.Properties().rarity(Rarity.EPIC)));
+            Moonlight.res("spawn_box"), p -> new GameMasterBlockItem(SPAWN_BOX_BLOCK.get(), p),
+            new Item.Properties().rarity(Rarity.EPIC).useBlockDescriptionPrefix());
 
     public static final Supplier<BlockEntityType<SpawnBoxBlockEntity>> SPAWN_BOX_BLOCK_ENTITY =
             RegHelper.registerBlockEntityType(Moonlight.res("spawn_box"),

@@ -24,9 +24,10 @@ public class RegHelperExample {
         RegHelper.addLootTableInjects(RegHelperExample::registerLootInjects);
     }
 
+    // Blocks and items take a factory plus their properties, just like vanilla, so registration can set their key
     protected static final Supplier<FlowerBlock> LILAC_FLOWER = RegHelper.registerBlockWithItem(
-            Moonlight.res("lilac"), () -> new FlowerBlock(
-                    MobEffects.HARM, 1, BlockBehaviour.Properties.of())
+            Moonlight.res("lilac"), p -> new FlowerBlock(MobEffects.HARM, 1, p),
+            BlockBehaviour.Properties.of()
     );
 
     // Generic entry registration. Just like Registry.register calls

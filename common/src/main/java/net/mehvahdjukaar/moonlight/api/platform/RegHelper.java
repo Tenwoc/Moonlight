@@ -115,19 +115,41 @@ public class RegHelper {
         throw new AssertionError();
     }
 
-    public static <T extends Block> RegSupplier<T> registerBlock(Identifier name, Supplier<T> block) {
-        return register(name, block, Registries.BLOCK);
+    /**
+     * A block needs its registry key before it's created, so like vanilla you give a factory plus the properties
+     * instead of a plain supplier. The key is set on the properties right before the factory runs
+     */
+    public static <T extends Block> RegSupplier<T> registerBlock(
+            Identifier name, Function<BlockBehaviour.Properties, T> factory, BlockBehaviour.Properties properties) {
+        return registerBlock(name, factory, () -> properties);
+    }
+
+    /**
+     * Same but for properties that can only be built later, like a copy of another block that is being registered now
+     */
+    public static <T extends Block> RegSupplier<T> registerBlock(
+            Identifier name, Function<BlockBehaviour.Properties, T> factory, Supplier<BlockBehaviour.Properties> properties) {
+        ResourceKey<Block> key = ResourceKey.create(Registries.BLOCK, name);
+        return register(name, () -> factory.apply(properties.get().setId(key)), Registries.BLOCK);
     }
 
     //helpers
-    public static <T extends Block> RegSupplier<T> registerBlockWithItem(Identifier name, Supplier<T> blockFactory) {
-        return registerBlockWithItem(name, blockFactory, new Item.Properties());
+    public static <T extends Block> RegSupplier<T> registerBlockWithItem(
+            Identifier name, Function<BlockBehaviour.Properties, T> factory, BlockBehaviour.Properties properties) {
+        return registerBlockWithItem(name, factory, properties, new Item.Properties());
     }
 
-    public static <T extends Block> RegSupplier<T> registerBlockWithItem(Identifier name, Supplier<T> blockFactory, Item.Properties properties) {
-        RegSupplier<T> block = registerBlock(name, blockFactory);
-        registerItem(name, () -> new BlockItem(block.get(), properties));
+    public static <T extends Block> RegSupplier<T> registerBlockWithItem(
+            Identifier name, Function<BlockBehaviour.Properties, T> factory, BlockBehaviour.Properties properties,
+            Item.Properties itemProperties) {
+        RegSupplier<T> block = registerBlock(name, factory, properties);
+        registerBlockItem(name, block, itemProperties);
         return block;
+    }
+
+    public static RegSupplier<BlockItem> registerBlockItem(Identifier name, Supplier<? extends Block> block,
+                                                           Item.Properties properties) {
+        return registerItem(name, p -> new BlockItem(block.get(), p), properties.useBlockDescriptionPrefix());
     }
 
     public static <T extends SimpleCriterionTrigger<?>> RegSupplier<T> registerTriggerType(Identifier name, Supplier<T> instance) {
@@ -274,8 +296,17 @@ public class RegHelper {
         throw new AssertionError();
     }
 
-    public static <T extends Item> RegSupplier<T> registerItem(Identifier name, Supplier<T> item) {
-        return register(name, item, Registries.ITEM);
+    public static <T extends Item> RegSupplier<T> registerItem(Identifier name, Function<Item.Properties, T> factory) {
+        return registerItem(name, factory, new Item.Properties());
+    }
+
+    /**
+     * Like blocks, items need their key at creation time, so this takes a factory and the properties it will get
+     */
+    public static <T extends Item> RegSupplier<T> registerItem(
+            Identifier name, Function<Item.Properties, T> factory, Item.Properties properties) {
+        ResourceKey<Item> key = ResourceKey.create(Registries.ITEM, name);
+        return register(name, () -> factory.apply(properties.setId(key)), Registries.ITEM);
     }
 
     public static <T extends Feature<?>> RegSupplier<T> registerFeature(Identifier name, Supplier<T> feature) {
@@ -725,8 +756,7 @@ public class RegHelper {
         if (!new ArrayList<>(List.of(types)).contains(VariantType.BLOCK))
             throw new IllegalStateException("Must contain base variant type");
 
-        var block = registerBlock(baseName, () -> VariantType.BLOCK.create(properties, null));
-        registerItem(baseName, () -> new BlockItem(block.get(), (new Item.Properties())));
+        var block = registerBlockWithItem(baseName, p -> VariantType.BLOCK.create(p, null), properties);
 
         var m = registerBlockSet(types, block, baseName.getNamespace());
         m.put(VariantType.BLOCK, block);
@@ -743,9 +773,9 @@ public class RegHelper {
             String name = baseName.getPath();
             name += "_" + type.name().toLowerCase(Locale.ROOT);
             Identifier blockId = Identifier.fromNamespaceAndPath(modId, name);
-            var block = registerBlock(blockId, () ->
-                    type.create(BlockBehaviour.Properties.ofFullCopy(baseBlock.get()), baseBlock::get));
-            registerItem(blockId, () -> new BlockItem(block.get(), new Item.Properties()));
+            var block = registerBlock(blockId, p -> type.create(p, baseBlock::get),
+                    () -> BlockBehaviour.Properties.ofFullCopy(baseBlock.get()));
+            registerBlockItem(blockId, block, new Item.Properties());
             map.put(type, block);
         }
         return map;

@@ -4,7 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import net.mehvahdjukaar.candlelight.api.ClientOnly;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.ItemInHandRenderer;
-import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.item.Item;
@@ -24,7 +24,7 @@ public interface IFirstPersonSpecialItemRenderer {
     @ClientOnly
     boolean renderFirstPersonItem(AbstractClientPlayer player, ItemStack stack, InteractionHand hand, HumanoidArm arm, PoseStack poseStack,
                                   float partialTicks, float pitch, float attackAnim, float equipAnim,
-                                  MultiBufferSource buffer, int light, ItemInHandRenderer renderer);
+                                  SubmitNodeCollector submitNodeCollector, int light, ItemInHandRenderer renderer);
 
     @Nullable
     static IFirstPersonSpecialItemRenderer get(Item target) {

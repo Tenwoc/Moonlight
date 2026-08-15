@@ -31,6 +31,9 @@ transitive-accessible method net/minecraft/world/entity/ai/village/poi/PoiTypes 
 
 accessible field net/minecraft/world/level/block/Block item Lnet/minecraft/world/item/Item;
 
+#26.1: a block keeps its key in its properties, so no reverse registry lookup needed
+accessible field net/minecraft/world/level/block/state/BlockBehaviour$Properties id Lnet/minecraft/resources/ResourceKey;
+
 #26.1: Boat.Type is gone, boats are entity types. WoodType reads it back off the boat item
 accessible field net/minecraft/world/item/BoatItem entityType Lnet/minecraft/world/entity/EntityType;
 

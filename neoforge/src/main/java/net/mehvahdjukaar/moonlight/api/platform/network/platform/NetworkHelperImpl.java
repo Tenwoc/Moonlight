@@ -65,6 +65,7 @@ public class NetworkHelperImpl {
                             .versioned(versionStr)
                             .executesOn(HandlerThread.MAIN)
                             .playBidirectional(messageType.type(), messageType.codec(),
+                                    (m, c) -> m.handle(new ContextWrapper(c)),
                                     (m, c) -> m.handle(new ContextWrapper(c)));
                 }
             };
